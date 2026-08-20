@@ -41,7 +41,6 @@ class EntityRelationship(BaseModel):
 
 class DocumentIntelligenceResult(BaseModel):
     document_id: str
-    filename: str
     document_type: str  # invoice | receipt | flight_ticket | bank_statement | medical_report | contract | form | certificate | unknown
     confidence_score: float = 1.0
     entities: List[ExtractedEntity] = Field(default_factory=list)
@@ -50,16 +49,16 @@ class DocumentIntelligenceResult(BaseModel):
     elements: List[DocumentElement] = Field(default_factory=list)
     structured_json: Dict[str, Any] = Field(default_factory=dict)
 
-class StoredDocumentSummary(BaseModel):
+class StructuredInformationSummary(BaseModel):
     id: str
-    filename: str
     document_type: str
+    title_highlight: str
     created_at: str
-    total_pages: int
-    average_confidence: float
-    entity_count: int
-    table_count: int
-    needs_review_count: int
+    total_pages: int = 1
+    average_confidence: float = 0.0
+    entity_count: int = 0
+    table_count: int = 0
+    needs_review_count: int = 0
     key_highlights: Dict[str, Any] = Field(default_factory=dict)
 
 class QueryPlan(BaseModel):
@@ -78,5 +77,6 @@ class QueryResponse(BaseModel):
     answer_summary: str
     total_matches: int
     aggregated_value: Optional[Union[float, int, str]] = None
-    documents: List[StoredDocumentSummary] = Field(default_factory=list)
+    documents: List[StructuredInformationSummary] = Field(default_factory=list)
     matching_entities: List[ExtractedEntity] = Field(default_factory=list)
+

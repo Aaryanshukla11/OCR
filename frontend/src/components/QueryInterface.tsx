@@ -161,7 +161,7 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({ onSelectDocument
                       <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
                       <div className="truncate">
                         <h4 className="text-xs font-mono font-semibold text-zinc-200 truncate group-hover:text-white">
-                          {doc.filename}
+                          {doc.title_highlight}
                         </h4>
                         <div className="flex items-center space-x-2 text-[10px] font-mono text-zinc-500 mt-0.5">
                           <span className="uppercase">{doc.document_type}</span>

@@ -11,7 +11,7 @@ import { AccuracyEvalPanel } from './components/AccuracyEvalPanel';
 import { CategoryBrowser } from './components/CategoryBrowser';
 import { HistoryView } from './components/HistoryView';
 import { IntelligencePanel } from './components/IntelligencePanel';
-import { DocumentExplorer } from './components/DocumentExplorer';
+import { StructuredDataStore } from './components/StructuredDataStore';
 import { QueryInterface } from './components/QueryInterface';
 import type { OCRResponse } from './types';
 import { LayoutGrid, Columns, AlertCircle, FileCheck, TestTube, Target, FileSearch, FileText, Cpu } from 'lucide-react';
@@ -219,9 +219,9 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Document Explorer Tab */}
+        {/* Structured Data Store Tab */}
         {activeTab === 'explorer' && (
-          <DocumentExplorer onSelectDocument={handleInspectStoredDocument} />
+          <StructuredDataStore onSelectDocument={handleInspectStoredDocument} />
         )}
 
         {/* Natural Language Query Engine Tab */}

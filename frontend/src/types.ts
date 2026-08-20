@@ -74,16 +74,17 @@ export interface OCRResponse {
   intelligence?: DocumentIntelligenceResult;
 }
 
-export interface StoredDocumentSummary {
+export interface StructuredInformationSummary {
   id: string;
-  filename: string;
   document_type: string;
+  title_highlight: string;
   created_at: string;
   total_pages: number;
   average_confidence: number;
   entity_count: number;
   table_count: number;
   needs_review_count: number;
+  key_highlights?: Record<string, any>;
 }
 
 export interface QueryPlan {
@@ -103,7 +104,7 @@ export interface QueryResponse {
   answer_summary: string;
   total_matches: number;
   aggregated_value?: number | string | null;
-  documents: StoredDocumentSummary[];
+  documents: StructuredInformationSummary[];
   matching_entities: ExtractedEntity[];
 }
 

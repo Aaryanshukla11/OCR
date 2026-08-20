@@ -4,29 +4,28 @@ import os
 import shutil
 import tempfile
 
-try:
-    from app.core.schemas import OCRDocumentResult, DocumentInfo, PageResult, RegionResult, ProcessingMetadata, AccuracyMetrics
-    from app.intelligence.understanding import DocumentUnderstandingEngine
-    from app.services.database import DatabaseService
-    from app.services.query_engine import DocumentQueryEngine
-except ImportError:
-    import importlib
-    schemas = importlib.import_module("app.core.schemas")
-    OCRDocumentResult = schemas.OCRDocumentResult
-    DocumentInfo = schemas.DocumentInfo
-    PageResult = schemas.PageResult
-    RegionResult = schemas.RegionResult
-    ProcessingMetadata = schemas.ProcessingMetadata
-    AccuracyMetrics = schemas.AccuracyMetrics
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
-    understanding = importlib.import_module("app.intelligence.understanding")
-    DocumentUnderstandingEngine = understanding.DocumentUnderstandingEngine
+import importlib
 
-    database = importlib.import_module("app.services.database")
-    DatabaseService = database.DatabaseService
+schemas = importlib.import_module("app.core.schemas")
+OCRDocumentResult = schemas.OCRDocumentResult
+DocumentInfo = schemas.DocumentInfo
+PageResult = schemas.PageResult
+RegionResult = schemas.RegionResult
+ProcessingMetadata = schemas.ProcessingMetadata
+AccuracyMetrics = schemas.AccuracyMetrics
 
-    query_engine = importlib.import_module("app.services.query_engine")
-    DocumentQueryEngine = query_engine.DocumentQueryEngine
+understanding = importlib.import_module("app.intelligence.understanding")
+DocumentUnderstandingEngine = understanding.DocumentUnderstandingEngine
+
+database = importlib.import_module("app.services.database")
+DatabaseService = database.DatabaseService
+
+query_engine = importlib.import_module("app.services.query_engine")
+DocumentQueryEngine = query_engine.DocumentQueryEngine
 
 @pytest.fixture(autouse=True)
 def setup_test_db(tmp_path):
@@ -38,7 +37,7 @@ def setup_test_db(tmp_path):
     if os.path.exists(test_db):
         os.remove(test_db)
 
-def create_mock_ocr_result(filename="test_invoice.png", text_lines=None, doc_type="invoice"):
+def create_mock_ocr_result(filename="test_invoice.png", text_lines=None):
     if text_lines is None:
         text_lines = [
             "TAX INVOICE",
@@ -113,7 +112,7 @@ def test_value_normalization():
     assert val_type_dt == "date"
     assert norm_dt == "2026-08-20"
 
-def test_sqlite_storage():
+def test_sqlite_structured_storage():
     engine = DocumentUnderstandingEngine()
     mock_ocr = create_mock_ocr_result(filename="receipt_123.png")
 
@@ -127,15 +126,15 @@ def test_sqlite_storage():
 
     assert doc_id == intel_result.document_id
 
-    # Retrieve stored documents
+    # Retrieve stored structured summaries
     docs = DatabaseService.get_documents()
     assert len(docs) == 1
-    assert docs[0].filename == "receipt_123.png"
+    assert "INVOICE" in docs[0].title_highlight
 
     # Retrieve detailed payload
     detail = DatabaseService.get_document_by_id(doc_id)
     assert detail is not None
-    assert detail["filename"] == "receipt_123.png"
+    assert detail["document_type"] == "invoice"
     assert len(detail["entities"]) > 0
 
 def test_query_engine():
@@ -153,7 +152,7 @@ def test_query_engine():
     # Test Query Execution
     response = DocumentQueryEngine.execute_query("Show me all invoices")
     assert response.total_matches >= 1
-    assert response.documents[0].filename == "august_bill.png"
+    assert "INVOICE" in response.documents[0].title_highlight
 
     # Test Aggregation Query
     sum_response = DocumentQueryEngine.execute_query("How much did I spend on invoices?")

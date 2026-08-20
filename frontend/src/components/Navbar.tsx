@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Database className="w-3.5 h-3.5" />
-              <span>Document Explorer</span>
+              <span>Structured Data Store</span>
             </button>
 
             <button

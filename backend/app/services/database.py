@@ -3,20 +3,20 @@ import json
 import sqlite3
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 
 from app.schemas.intelligence_schema import (
-    DocumentIntelligenceResult, StoredDocumentSummary, ExtractedEntity, ExtractedTable
+    DocumentIntelligenceResult, StructuredInformationSummary
 )
 
 logger = logging.getLogger("DatabaseService")
 
 DB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data"))
+
 class DatabaseService:
     """
-    SQLite Database Service for storing and indexing structured document intelligence.
-    Keeps database schemas document-agnostic. Stores raw text, full structured JSON,
-    and indexed relational tables for fast parameter SQL querying.
+    SQLite Database Service for storing and querying EXCLUSIVELY extracted structured information.
+    Original document files/binaries are NOT stored. Stores structured_data JSON and indexed entities.
     """
     DB_DIR = DB_DIR
     DB_PATH = os.path.join(DB_DIR, "document_intelligence.db")
@@ -30,28 +30,25 @@ class DatabaseService:
 
     @classmethod
     def init_db(cls):
-        """Initializes SQLite database schema and indexes."""
+        """Initializes SQLite database schema and indexes for structured information."""
         conn = cls.get_connection()
         cursor = conn.cursor()
 
-        # 1. Main Documents Table
+        # 1. Main Structured Documents Knowledge Table (No raw file storage)
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS documents (
+            CREATE TABLE IF NOT EXISTS structured_documents (
                 id TEXT PRIMARY KEY,
-                filename TEXT NOT NULL,
                 document_type TEXT NOT NULL,
+                structured_data TEXT NOT NULL,
+                confidence REAL DEFAULT 0.0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                total_pages INTEGER DEFAULT 1,
-                average_confidence REAL DEFAULT 0.0,
-                raw_text TEXT,
-                structured_json TEXT NOT NULL,
-                metadata_json TEXT
+                metadata TEXT
             );
         """)
 
-        # 2. Indexed Relational Entities Table
+        # 2. Relational Entity Index for SQL Querying
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS document_entities (
+            CREATE TABLE IF NOT EXISTS extracted_entities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 document_id TEXT NOT NULL,
                 key TEXT NOT NULL,
@@ -63,74 +60,66 @@ class DatabaseService:
                 source_page INTEGER DEFAULT 1,
                 source_bbox_json TEXT,
                 needs_review INTEGER DEFAULT 0,
-                FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
-            );
-        """)
-
-        # 3. Indexed Relational Tables Table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS document_tables (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                document_id TEXT NOT NULL,
-                page_number INTEGER DEFAULT 1,
-                headers_json TEXT,
-                rows_json TEXT,
-                FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
+                FOREIGN KEY (document_id) REFERENCES structured_documents (id) ON DELETE CASCADE
             );
         """)
 
         # Indexes for fast SQL search & filtering
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_doc_type ON documents (document_type);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_doc_created ON documents (created_at);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_doc ON document_entities (document_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_key ON document_entities (key);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_norm ON document_entities (normalized_value);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_type ON document_entities (value_type);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_struct_doc_type ON structured_documents (document_type);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_struct_created ON structured_documents (created_at);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_doc ON extracted_entities (document_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_key ON extracted_entities (key);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_norm ON extracted_entities (normalized_value);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_type ON extracted_entities (value_type);")
 
         conn.commit()
         conn.close()
-        logger.info(f"SQLite Document Intelligence Database initialized at: {cls.DB_PATH}")
+        logger.info(f"SQLite Structured Knowledge Database initialized at: {cls.DB_PATH}")
 
     @classmethod
     def save_document(
         cls,
         intel_result: DocumentIntelligenceResult,
-        total_pages: int,
-        average_confidence: float,
-        raw_text: str
+        total_pages: int = 1,
+        average_confidence: float = 0.0,
+        raw_text: str = ""
     ) -> str:
-        """Saves a document intelligence result into SQLite database."""
+        """
+        Saves ONLY extracted structured document information into SQLite.
+        Does NOT store persistent original binary or path references.
+        """
         cls.init_db()
         conn = cls.get_connection()
         cursor = conn.cursor()
 
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 1. Insert into documents table
+        # 1. Insert into structured_documents table
         cursor.execute("""
-            INSERT OR REPLACE INTO documents (
-                id, filename, document_type, created_at, total_pages,
-                average_confidence, raw_text, structured_json, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO structured_documents (
+                id, document_type, structured_data, confidence, created_at, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?)
         """, (
             intel_result.document_id,
-            intel_result.filename,
             intel_result.document_type,
-            created_at,
-            total_pages,
-            average_confidence,
-            raw_text,
             json.dumps(intel_result.structured_json),
-            json.dumps({"confidence_score": intel_result.confidence_score})
+            intel_result.confidence_score or average_confidence,
+            created_at,
+            json.dumps({
+                "total_pages": total_pages,
+                "average_confidence": average_confidence,
+                "entity_count": len(intel_result.entities),
+                "table_count": len(intel_result.tables)
+            })
         ))
 
-        # 2. Insert extracted entities
+        # 2. Insert extracted entity index
         for entity in intel_result.entities:
             source_bbox_str = json.dumps(entity.source.bbox) if entity.source else "[]"
             source_pg = entity.source.page if entity.source else 1
 
             cursor.execute("""
-                INSERT INTO document_entities (
+                INSERT INTO extracted_entities (
                     document_id, key, label, raw_value, normalized_value,
                     value_type, confidence, source_page, source_bbox_json, needs_review
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -147,22 +136,9 @@ class DatabaseService:
                 1 if entity.needs_review else 0
             ))
 
-        # 3. Insert tables
-        for tbl in intel_result.tables:
-            cursor.execute("""
-                INSERT INTO document_tables (
-                    document_id, page_number, headers_json, rows_json
-                ) VALUES (?, ?, ?, ?)
-            """, (
-                intel_result.document_id,
-                tbl.page_number,
-                json.dumps(tbl.headers),
-                json.dumps(tbl.rows)
-            ))
-
         conn.commit()
         conn.close()
-        logger.info(f"Document '{intel_result.filename}' saved to SQLite with ID '{intel_result.document_id}'")
+        logger.info(f"Extracted structured knowledge (ID '{intel_result.document_id}') saved to SQLite.")
         return intel_result.document_id
 
     @classmethod
@@ -171,21 +147,19 @@ class DatabaseService:
         document_type: Optional[str] = None,
         search_query: Optional[str] = None,
         limit: int = 50
-    ) -> List[StoredDocumentSummary]:
-        """Fetches stored document summaries from SQLite database."""
+    ) -> List[StructuredInformationSummary]:
+        """Fetches stored structured information summaries from SQLite."""
         cls.init_db()
         conn = cls.get_connection()
         cursor = conn.cursor()
 
         sql = """
             SELECT 
-                d.id, d.filename, d.document_type, d.created_at, d.total_pages, d.average_confidence,
+                d.id, d.document_type, d.structured_data, d.confidence, d.created_at, d.metadata,
                 COUNT(DISTINCT e.id) as entity_count,
-                COUNT(DISTINCT t.id) as table_count,
                 SUM(CASE WHEN e.needs_review = 1 THEN 1 ELSE 0 END) as needs_review_count
-            FROM documents d
-            LEFT JOIN document_entities e ON d.id = e.document_id
-            LEFT JOIN document_tables t ON d.id = t.document_id
+            FROM structured_documents d
+            LEFT JOIN extracted_entities e ON d.id = e.document_id
         """
 
         params = []
@@ -196,7 +170,7 @@ class DatabaseService:
             params.append(document_type)
 
         if search_query and search_query.strip():
-            where_clauses.append("(LOWER(d.filename) LIKE ? OR LOWER(d.raw_text) LIKE ?)")
+            where_clauses.append("(LOWER(d.structured_data) LIKE ? OR LOWER(e.raw_value) LIKE ?)")
             q = f"%{search_query.strip().lower()}%"
             params.extend([q, q])
 
@@ -210,67 +184,72 @@ class DatabaseService:
         rows = cursor.fetchall()
         conn.close()
 
-        summaries: List[StoredDocumentSummary] = []
+        summaries: List[StructuredInformationSummary] = []
         for r in rows:
-            summaries.append(StoredDocumentSummary(
+            structured = {}
+            meta = {}
+            try:
+                structured = json.loads(r["structured_data"])
+                if r["metadata"]:
+                    meta = json.loads(r["metadata"])
+            except Exception:
+                pass
+
+            title_highlight = structured.get("title_highlight") or f"{r['document_type'].replace('_', ' ').upper()} Record"
+            key_highlights = structured.get("key_highlights") or {}
+
+            summaries.append(StructuredInformationSummary(
                 id=r["id"],
-                filename=r["filename"],
                 document_type=r["document_type"],
+                title_highlight=title_highlight,
                 created_at=r["created_at"],
-                total_pages=r["total_pages"],
-                average_confidence=r["average_confidence"],
+                total_pages=meta.get("total_pages", 1),
+                average_confidence=round(r["confidence"] * 100 if r["confidence"] <= 1.0 else r["confidence"], 1),
                 entity_count=r["entity_count"] or 0,
-                table_count=r["table_count"] or 0,
-                needs_review_count=r["needs_review_count"] or 0
+                table_count=meta.get("table_count", 0),
+                needs_review_count=r["needs_review_count"] or 0,
+                key_highlights=key_highlights
             ))
 
         return summaries
 
     @classmethod
     def get_document_by_id(cls, doc_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves full document intelligence payload by document ID."""
+        """Retrieves full extracted structured information payload by ID."""
         cls.init_db()
         conn = cls.get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
+        cursor.execute("SELECT * FROM structured_documents WHERE id = ?", (doc_id,))
         doc_row = cursor.fetchone()
         if not doc_row:
             conn.close()
             return None
 
-        # Retrieve entities
-        cursor.execute("SELECT * FROM document_entities WHERE document_id = ?", (doc_id,))
+        # Retrieve indexed entities
+        cursor.execute("SELECT * FROM extracted_entities WHERE document_id = ?", (doc_id,))
         entity_rows = cursor.fetchall()
-
-        # Retrieve tables
-        cursor.execute("SELECT * FROM document_tables WHERE document_id = ?", (doc_id,))
-        table_rows = cursor.fetchall()
 
         conn.close()
 
-        structured = json.loads(doc_row["structured_json"])
+        structured = json.loads(doc_row["structured_data"])
         
         return {
             "document_id": doc_row["id"],
-            "filename": doc_row["filename"],
             "document_type": doc_row["document_type"],
             "created_at": doc_row["created_at"],
-            "total_pages": doc_row["total_pages"],
-            "average_confidence": doc_row["average_confidence"],
-            "raw_text": doc_row["raw_text"],
+            "confidence": doc_row["confidence"],
             "structured_json": structured,
             "entities": [dict(e) for e in entity_rows],
-            "tables": [dict(t) for t in table_rows],
         }
 
     @classmethod
     def delete_document(cls, doc_id: str) -> bool:
-        """Deletes document and cascade entity records."""
+        """Deletes structured document entry and cascade entity indices."""
         cls.init_db()
         conn = cls.get_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        cursor.execute("DELETE FROM structured_documents WHERE id = ?", (doc_id,))
         deleted = cursor.rowcount > 0
         conn.commit()
         conn.close()

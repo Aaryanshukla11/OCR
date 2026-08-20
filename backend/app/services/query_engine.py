@@ -1,11 +1,12 @@
 import re
+import json
 import sqlite3
 import logging
 from typing import List, Dict, Any, Optional
 
 from app.services.database import DatabaseService
 from app.schemas.intelligence_schema import (
-    QueryPlan, QueryResponse, StoredDocumentSummary, ExtractedEntity, SourceProvenance
+    QueryPlan, QueryResponse, StructuredInformationSummary, ExtractedEntity, SourceProvenance
 )
 
 logger = logging.getLogger("DocumentQueryEngine")
@@ -86,7 +87,6 @@ class DocumentQueryEngine:
             date_end = "2026-07-31"
 
         # 5. Extract Named Entity Search Terms
-        # Remove common stop words
         stop_words = {"show", "me", "all", "invoices", "receipts", "flights", "documents", "from", "the", "which", "did", "take", "in", "august", "give", "gst", "number", "of", "find", "how", "much", "spend", "on", "food", "who", "what", "is", "a"}
         words = re.findall(r"\b[A-Za-z0-9]+\b", query)
         for w in words:
@@ -112,10 +112,10 @@ class DocumentQueryEngine:
         # Build SQL query dynamically and safely using parameters
         sql = """
             SELECT 
-                d.id as doc_id, d.filename, d.document_type, d.created_at, d.total_pages, d.average_confidence,
+                d.id as doc_id, d.document_type, d.structured_data, d.confidence as doc_conf, d.created_at,
                 e.key, e.label, e.raw_value, e.normalized_value, e.value_type, e.confidence, e.source_page, e.source_bbox_json
-            FROM documents d
-            LEFT JOIN document_entities e ON d.id = e.document_id
+            FROM structured_documents d
+            LEFT JOIN extracted_entities e ON d.id = e.document_id
         """
 
         where_conditions = []
@@ -132,9 +132,9 @@ class DocumentQueryEngine:
         if plan.search_terms:
             term_clauses = []
             for term in plan.search_terms:
-                term_clauses.append("(LOWER(d.filename) LIKE ? OR LOWER(d.raw_text) LIKE ? OR LOWER(e.raw_value) LIKE ?)")
+                term_clauses.append("(LOWER(d.structured_data) LIKE ? OR LOWER(e.raw_value) LIKE ?)")
                 p = f"%{term.lower()}%"
-                params.extend([p, p, p])
+                params.extend([p, p])
             where_conditions.append("(" + " OR ".join(term_clauses) + ")")
 
         if where_conditions:
@@ -149,7 +149,7 @@ class DocumentQueryEngine:
 
         # Process Results
         matched_doc_ids = set()
-        matched_doc_summaries: Dict[str, StoredDocumentSummary] = {}
+        matched_doc_summaries: Dict[str, StructuredInformationSummary] = {}
         matching_entities: List[ExtractedEntity] = []
         numeric_values: List[float] = []
 
@@ -158,16 +158,26 @@ class DocumentQueryEngine:
             matched_doc_ids.add(doc_id)
 
             if doc_id not in matched_doc_summaries:
-                matched_doc_summaries[doc_id] = StoredDocumentSummary(
+                structured = {}
+                try:
+                    structured = json.loads(r["structured_data"])
+                except Exception:
+                    pass
+
+                title_highlight = structured.get("title_highlight") or f"{r['document_type'].replace('_', ' ').upper()} Record"
+                key_highlights = structured.get("key_highlights") or {}
+
+                matched_doc_summaries[doc_id] = StructuredInformationSummary(
                     id=doc_id,
-                    filename=r["filename"],
                     document_type=r["document_type"],
+                    title_highlight=title_highlight,
                     created_at=r["created_at"],
-                    total_pages=r["total_pages"],
-                    average_confidence=r["average_confidence"],
-                    entity_count=0,
-                    table_count=0,
-                    needs_review_count=0
+                    total_pages=1,
+                    average_confidence=round(r["doc_conf"] * 100 if r["doc_conf"] <= 1.0 else r["doc_conf"], 1),
+                    entity_count=len(structured.get("fields", {})),
+                    table_count=len(structured.get("tables", [])),
+                    needs_review_count=0,
+                    key_highlights=key_highlights
                 )
 
             if r["key"]:

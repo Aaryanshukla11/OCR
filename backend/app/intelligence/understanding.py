@@ -62,12 +62,16 @@ class DocumentUnderstandingEngine:
         # 5. Entity Relationships
         relationships = self._build_relationships(entities, document_type)
 
-        # 6. Assemble Full Structured JSON
+        # 6. Build Title & Highlights for Structured Store Cards
+        title_highlight, key_highlights = self._build_title_and_highlights(document_type, entities)
+
+        # 7. Assemble Full Structured Information JSON (No raw binary/file storage)
         structured_json = {
             "document_id": doc_id,
-            "filename": filename,
             "document_type": document_type,
+            "title_highlight": title_highlight,
             "confidence_score": doc_type_conf,
+            "key_highlights": key_highlights,
             "summary": {
                 "total_pages": ocr_result.document.page_count,
                 "total_regions": ocr_result.total_regions,
@@ -82,15 +86,15 @@ class DocumentUnderstandingEngine:
                 "value_type": e.value_type,
                 "confidence": e.confidence,
                 "currency": e.currency,
-                "needs_review": e.needs_review
+                "needs_review": e.needs_review,
+                "provenance": e.source.dict() if e.source else None
             } for e in entities},
             "tables": [t.dict() for t in tables],
-            "extracted_text": ocr_result.aggregated_text
+            "relationships": [r.dict() for r in relationships],
         }
 
         return DocumentIntelligenceResult(
             document_id=doc_id,
-            filename=filename,
             document_type=document_type,
             confidence_score=doc_type_conf,
             entities=entities,
@@ -99,6 +103,60 @@ class DocumentUnderstandingEngine:
             elements=elements,
             structured_json=structured_json
         )
+
+    def _build_title_and_highlights(self, document_type: str, entities: List[ExtractedEntity]) -> Tuple[str, Dict[str, Any]]:
+        entity_map = {e.key: e.raw_value for e in entities}
+
+        title_parts = [document_type.replace("_", " ").upper()]
+        highlights = {}
+
+        if document_type in ["invoice", "receipt"]:
+            merchant = entity_map.get("merchant_name") or entity_map.get("vendor") or entity_map.get("merchant")
+            inv_no = entity_map.get("invoice_number") or entity_map.get("receipt_number") or entity_map.get("invoice_no")
+            total = entity_map.get("total_amount") or entity_map.get("total") or entity_map.get("amount_due")
+
+            if merchant:
+                title_parts.append(merchant)
+                highlights["merchant"] = merchant
+            if inv_no:
+                highlights["invoice_number"] = inv_no
+            if total:
+                highlights["total"] = total
+
+        elif document_type == "flight_ticket":
+            passenger = entity_map.get("passenger_name") or entity_map.get("passenger")
+            pnr = entity_map.get("pnr_number") or entity_map.get("pnr")
+            route = entity_map.get("route") or entity_map.get("flight")
+
+            if passenger:
+                title_parts.append(passenger)
+                highlights["passenger"] = passenger
+            if pnr:
+                highlights["pnr"] = pnr
+            if route:
+                highlights["route"] = route
+
+        elif document_type == "hotel_invoice":
+            guest = entity_map.get("guest_name") or entity_map.get("guest")
+            hotel = entity_map.get("hotel_name") or entity_map.get("hotel")
+            if guest:
+                title_parts.append(guest)
+                highlights["guest"] = guest
+            if hotel:
+                highlights["hotel"] = hotel
+
+        else:
+            # For unknown / custom document types, take first 2 prominent extracted entities
+            prominent = []
+            for e in entities[:3]:
+                prominent.append(f"{e.label}: {e.raw_value}")
+                highlights[e.key] = e.raw_value
+            if prominent:
+                title_parts.extend(prominent[:2])
+
+        title_highlight = " • ".join(title_parts)
+        return title_highlight, highlights
+
 
     def _infer_document_type(self, full_text: str, all_regions: List[Tuple[int, RegionResult]]) -> Tuple[str, float]:
         """
