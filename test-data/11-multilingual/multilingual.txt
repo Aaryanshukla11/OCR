@@ -1,0 +1,3 @@
+ENGLISH: Welcome to the System
+HINDI: Softare Evaluation
+NUMBERS: 1234567890

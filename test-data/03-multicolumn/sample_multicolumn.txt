@@ -1,0 +1,7 @@
+COLUMN 1: Sales Analysis
+North Region: $40,000
+South Region: $55,000
+
+COLUMN 2: Operational Highlights
+Expansion complete.
+Customer retention: 94%

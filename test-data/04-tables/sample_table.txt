@@ -1,0 +1,4 @@
+ITEM | QTY | PRICE | TOTAL
+Laptop Stand | 2 | $45.00 | $90.00
+USB-C Cable | 5 | $12.00 | $60.00
+Wireless Mouse | 1 | $35.00 | $35.00

@@ -1,0 +1,3 @@
+ORIENTED TEXT BLOCK
+Rotating 90 degrees test.
+PaddleOCR text orientation check.

@@ -1,0 +1,5 @@
+PATIENT REGISTRATION FORM
+Name: Aaryan Shukla
+DOB: 15/04/1998
+Phone: +91 9876543210
+Blood Group: O+

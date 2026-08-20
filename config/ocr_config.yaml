@@ -1,0 +1,24 @@
+engine:
+  name: "Our OCR Engine"
+  version: "1.0.0"
+
+ocr:
+  provider: "paddleocr"
+  device: "auto" # auto, cpu, gpu
+  lang: "en"
+
+preprocessing:
+  enabled: true
+  deskew: false
+  denoise: false
+  contrast: false
+  max_side_len: 4000
+
+postprocessing:
+  enabled: true
+  normalize_whitespace: true
+  sort_reading_order: true
+
+validation:
+  max_file_size_mb: 25
+  allowed_extensions: [".png", ".jpg", ".jpeg", ".webp", ".pdf"]

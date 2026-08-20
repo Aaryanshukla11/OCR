@@ -1,0 +1,3 @@
+Note: Review PaddleOCR accuracy
+Check CER and WER scores
+Meeting at 4:00 PM today!

@@ -1,0 +1,6 @@
+TAX INVOICE
+Invoice No: INV-1024
+Customer: Acme Corp
+Subtotal: INR 42,372.88
+GST (18%): INR 7,627.12
+Total: INR 50,000.00

@@ -1,0 +1,4 @@
+INVOICE #INV-9081
+Date: 2026-08-20
+Amount Due: $1,250.00
+Payment Terms: Net 30
