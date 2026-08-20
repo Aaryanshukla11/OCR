@@ -10,80 +10,80 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({ data }) => {
   const isGpu = data.device.toUpperCase().includes('GPU');
   
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl">
-      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
+    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-xs">
+      <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3 flex items-center justify-between font-mono">
         <span className="flex items-center space-x-2">
-          <Target className="w-4 h-4 text-indigo-400" />
+          <Target className="w-4 h-4 text-zinc-400" />
           <span>Execution & Evaluation Metrics</span>
         </span>
-        <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
-          Actual Runtime Data
+        <span className="text-[10px] bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded border border-zinc-800">
+          Runtime Data
         </span>
       </h3>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {/* Model */}
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-          <div className="flex items-center text-xs text-slate-400 mb-1 space-x-1.5">
-            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center text-[10px] text-zinc-500 mb-1 space-x-1 font-mono">
+            <Layers className="w-3 h-3 text-zinc-400" />
             <span>MODEL</span>
           </div>
-          <p className="text-sm font-bold text-white tracking-tight">PaddleOCR 3.7.0</p>
+          <p className="text-xs font-semibold text-zinc-100 font-mono">PaddleOCR 3.7.0</p>
         </div>
 
         {/* Device */}
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-          <div className="flex items-center text-xs text-slate-400 mb-1 space-x-1.5">
-            {isGpu ? <Zap className="w-3.5 h-3.5 text-amber-400" /> : <Cpu className="w-3.5 h-3.5 text-blue-400" />}
+        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center text-[10px] text-zinc-500 mb-1 space-x-1 font-mono">
+            {isGpu ? <Zap className="w-3 h-3 text-zinc-300" /> : <Cpu className="w-3 h-3 text-zinc-400" />}
             <span>DEVICE</span>
           </div>
-          <p className={`text-sm font-bold tracking-tight ${isGpu ? 'text-amber-300' : 'text-slate-200'}`}>
+          <p className="text-xs font-semibold text-zinc-100 font-mono">
             {data.device}
           </p>
         </div>
 
         {/* Processing Time */}
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-          <div className="flex items-center text-xs text-slate-400 mb-1 space-x-1.5">
-            <Clock className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center text-[10px] text-zinc-500 mb-1 space-x-1 font-mono">
+            <Clock className="w-3 h-3 text-zinc-400" />
             <span>LATENCY</span>
           </div>
-          <p className="text-sm font-bold text-emerald-400 font-mono">{data.processing_time} sec</p>
+          <p className="text-xs font-semibold text-zinc-100 font-mono">{data.processing_time}s</p>
         </div>
 
         {/* Detected Regions */}
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-          <div className="flex items-center text-xs text-slate-400 mb-1 space-x-1.5">
-            <Target className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center text-[10px] text-zinc-500 mb-1 space-x-1 font-mono">
+            <Target className="w-3 h-3 text-zinc-400" />
             <span>REGIONS</span>
           </div>
-          <p className="text-sm font-bold text-cyan-300 font-mono">{data.total_regions} detected</p>
+          <p className="text-xs font-semibold text-zinc-100 font-mono">{data.total_regions} detected</p>
         </div>
 
         {/* Avg Confidence */}
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
-          <div className="flex items-center text-xs text-slate-400 mb-1 space-x-1.5">
-            <Award className="w-3.5 h-3.5 text-purple-400" />
+        <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+          <div className="flex items-center text-[10px] text-zinc-500 mb-1 space-x-1 font-mono">
+            <Award className="w-3 h-3 text-zinc-400" />
             <span>AVG CONFIDENCE</span>
           </div>
-          <p className="text-sm font-bold text-purple-300 font-mono">{data.average_confidence}%</p>
+          <p className="text-xs font-semibold text-zinc-100 font-mono">{data.average_confidence}%</p>
         </div>
       </div>
 
       {/* Accuracy Evaluation Banner */}
-      <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
-        <span className="text-slate-400 font-medium">Ground Truth Accuracy Evaluation:</span>
+      <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+        <span className="text-zinc-400 font-medium text-xs">Ground Truth Evaluation:</span>
         {data.accuracy.available ? (
-          <div className="flex items-center space-x-3 font-mono">
-            <span className="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20">
+          <div className="flex items-center space-x-2 font-mono text-xs">
+            <span className="bg-zinc-900 text-zinc-200 px-2 py-0.5 rounded border border-zinc-800">
               CER: {data.accuracy.cer}%
             </span>
-            <span className="bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/20">
+            <span className="bg-zinc-900 text-zinc-200 px-2 py-0.5 rounded border border-zinc-800">
               WER: {data.accuracy.wer}%
             </span>
           </div>
         ) : (
-          <span className="text-amber-400/90 font-mono text-[11px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+          <span className="text-zinc-400 font-mono text-[11px] bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
             {data.accuracy.message}
           </span>
         )}
@@ -91,3 +91,4 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({ data }) => {
     </div>
   );
 };
+

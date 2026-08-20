@@ -97,33 +97,33 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const hasSearch = searchQuery.trim().length > 0;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col h-full">
+    <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden shadow-xs flex flex-col h-full">
       {/* Control Bar */}
-      <div className="bg-slate-950 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between text-xs select-none gap-2">
+      <div className="bg-zinc-950 px-4 py-2 border-b border-zinc-800 flex flex-wrap items-center justify-between text-xs select-none gap-2">
         
         {/* Title & Page Nav */}
         <div className="flex items-center space-x-3">
-          <span className="font-semibold text-slate-300 flex items-center space-x-1">
-            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="font-medium text-zinc-200 flex items-center space-x-1.5 font-mono">
+            <Layers className="w-3.5 h-3.5 text-zinc-400" />
             <span>Document Viewer</span>
           </span>
 
           {pageResults.length > 1 && (
-            <div className="flex items-center space-x-1.5 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+            <div className="flex items-center space-x-1.5 bg-zinc-900 px-2 py-1 rounded-md border border-zinc-800">
               <button
                 disabled={activePageIndex === 0}
                 onClick={() => setActivePageIndex(activePageIndex - 1)}
-                className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                className="p-0.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-400"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-slate-300 font-mono">
+              <span className="text-zinc-300 font-mono text-xs">
                 Page {activePageIndex + 1} of {pageResults.length}
               </span>
               <button
                 disabled={activePageIndex === pageResults.length - 1}
                 onClick={() => setActivePageIndex(activePageIndex + 1)}
-                className="p-0.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                className="p-0.5 text-zinc-400 hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-400"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -134,37 +134,37 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         {/* Search Bar / Find Controls */}
         <div className="flex items-center space-x-2">
           {showInlineSearch && setSearchQuery ? (
-            <div className="flex items-center space-x-1 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/40">
-              <Search className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center space-x-1 bg-zinc-900 px-2 py-1 rounded-md border border-zinc-700">
+              <Search className="w-3.5 h-3.5 text-zinc-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find in image..."
-                className="bg-transparent text-xs text-slate-100 placeholder-slate-500 focus:outline-none w-32 sm:w-44 font-mono"
+                className="bg-transparent text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none w-32 sm:w-44 font-mono"
                 autoFocus
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="text-slate-400 hover:text-white p-0.5"
+                  className="text-zinc-400 hover:text-zinc-100 p-0.5"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
               {totalMatchesCount > 0 && (
-                <div className="flex items-center space-x-1 pl-1 border-l border-slate-800 text-[10px] font-mono text-amber-300">
+                <div className="flex items-center space-x-1 pl-1 border-l border-zinc-800 text-[10px] font-mono text-zinc-300">
                   <span>{currentMatchIndex + 1}/{totalMatchesCount}</span>
                   <button
                     onClick={onNavigatePrevMatch}
-                    className="hover:text-white p-0.5"
+                    className="hover:text-zinc-100 p-0.5"
                     title="Previous match"
                   >
                     <ChevronUp className="w-3 h-3" />
                   </button>
                   <button
                     onClick={onNavigateNextMatch}
-                    className="hover:text-white p-0.5"
+                    className="hover:text-zinc-100 p-0.5"
                     title="Next match"
                   >
                     <ChevronDown className="w-3 h-3" />
@@ -173,7 +173,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               )}
               <button
                 onClick={() => setShowInlineSearch(false)}
-                className="p-1 hover:bg-slate-800 text-slate-400 hover:text-white rounded ml-1"
+                className="p-1 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 rounded ml-1"
                 title="Close search bar"
               >
                 <X className="w-3.5 h-3.5" />
@@ -182,38 +182,38 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           ) : (
             <button
               onClick={() => setShowInlineSearch(true)}
-              className={`px-2.5 py-1 rounded border flex items-center space-x-1 font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-md border flex items-center space-x-1 font-medium transition-colors ${
                 hasSearch
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
               title="Find text in image (Search)"
             >
-              <Search className="w-3.5 h-3.5 text-amber-400" />
+              <Search className="w-3.5 h-3.5 text-zinc-400" />
               <span>{hasSearch ? `${totalMatchesCount} Match${totalMatchesCount !== 1 ? 'es' : ''}` : 'Find Text'}</span>
             </button>
           )}
 
           {/* View Controls */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-1">
             <button
               onClick={() => setShowBoxes(!showBoxes)}
-              className={`px-2.5 py-1 rounded border flex items-center space-x-1 font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-md border flex items-center space-x-1 font-medium transition-colors ${
                 showBoxes
-                  ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? 'bg-zinc-800 text-zinc-200 border-zinc-700'
+                  : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
               title="Toggle detected bounding box overlay"
             >
-              {showBoxes ? <Eye className="w-3.5 h-3.5 text-indigo-400" /> : <EyeOff className="w-3.5 h-3.5" />}
-              <span>{showBoxes ? 'Show BBoxes' : 'Hide BBoxes'}</span>
+              {showBoxes ? <Eye className="w-3.5 h-3.5 text-zinc-300" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span>{showBoxes ? 'BBoxes On' : 'BBoxes Off'}</span>
             </button>
 
-            <div className="h-4 w-px bg-slate-800 mx-1" />
+            <div className="h-4 w-px bg-zinc-800 mx-1" />
 
             <button
               onClick={handleZoomIn}
-              className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded border border-slate-800"
+              className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-md border border-zinc-800"
               title="Zoom In"
             >
               <ZoomIn className="w-3.5 h-3.5" />
@@ -221,7 +221,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             
             <button
               onClick={handleZoomOut}
-              className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded border border-slate-800"
+              className="p-1.5 bg-zinc-900 hover:bg-slate-800 text-zinc-300 rounded-md border border-zinc-800"
               title="Zoom Out"
             >
               <ZoomOut className="w-3.5 h-3.5" />
@@ -229,7 +229,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
             <button
               onClick={handleFitToScreen}
-              className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded border border-slate-800"
+              className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-md border border-zinc-800"
               title="Fit to Screen"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -237,13 +237,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
             <button
               onClick={handleResetZoom}
-              className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded border border-slate-800"
+              className="p-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-md border border-zinc-800"
               title="Reset Zoom"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-[11px] font-mono text-slate-400 min-w-[45px] text-right">
+            <span className="text-[11px] font-mono text-zinc-500 min-w-[42px] text-right">
               {Math.round(zoom * 100)}%
             </span>
           </div>
@@ -257,7 +257,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className={`flex-1 relative overflow-hidden bg-slate-950 flex items-center justify-center p-6 select-none ${
+        className={`flex-1 relative overflow-hidden bg-zinc-950 flex items-center justify-center p-6 select-none ${
           isPanning ? 'cursor-grabbing' : 'cursor-grab'
         }`}
       >
@@ -274,7 +274,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             src={imageSrc}
             alt="Original Document"
             onLoad={handleImageLoad}
-            className="max-w-full max-h-[600px] object-contain rounded shadow-2xl pointer-events-none border border-slate-800/80"
+            className="max-w-full max-h-[600px] object-contain rounded border border-zinc-800 pointer-events-none"
           />
 
           {showBoxes && imageDimensions.naturalWidth > 0 && (
@@ -294,28 +294,28 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
                 // Color calculation
                 let color = isSelected
-                  ? '#ec4899'
+                  ? '#ffffff'
                   : region.confidence >= 0.95
                   ? '#10b981'
                   : region.confidence >= 0.85
-                  ? '#3b82f6'
+                  ? '#a1a1aa'
                   : '#f59e0b';
 
-                let strokeWidth = isSelected ? 3 : 1.8;
-                let fillOpacity = isSelected ? '40' : '20';
+                let strokeWidth = isSelected ? 2.5 : 1.5;
+                let fillOpacity = isSelected ? '30' : '15';
                 let opacity = '1';
 
                 if (hasSearch) {
                   if (isActiveMatch) {
-                    color = '#fbbf24'; // Gold / bright amber for active search match
-                    strokeWidth = 4;
-                    fillOpacity = '60';
+                    color = '#f59e0b'; // Crisp amber for active search match
+                    strokeWidth = 3.5;
+                    fillOpacity = '50';
                   } else if (isSearchMatch) {
-                    color = '#f59e0b'; // Amber for search match
-                    strokeWidth = 2.8;
-                    fillOpacity = '35';
+                    color = '#d97706';
+                    strokeWidth = 2.5;
+                    fillOpacity = '30';
                   } else {
-                    opacity = '0.35'; // Dim non-matching regions during search
+                    opacity = '0.25'; // Dim non-matching regions
                   }
                 }
 
@@ -334,9 +334,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                       fill={`${color}${fillOpacity}`}
                       stroke={color}
                       strokeWidth={strokeWidth}
-                      className={`transition-all duration-150 group-hover:fill-amber-500/40 group-hover:stroke-amber-300 ${
-                        isActiveMatch ? 'animate-pulse' : ''
-                      }`}
+                      className="transition-all duration-150 group-hover:fill-zinc-100/30 group-hover:stroke-white"
                     />
                     {region.bbox && (
                       <text
@@ -344,7 +342,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                         y={Math.max(region.bbox[1] - 4, 12)}
                         fill={color}
                         fontSize={Math.max(10, imageDimensions.naturalWidth / 60)}
-                        fontWeight="bold"
+                        fontWeight="600"
                         className="font-mono select-none"
                       >
                         {isActiveMatch ? '★ ' : isSearchMatch ? '🔍 ' : ''}#{region.id} ({Math.round(region.confidence * 100)}%)
@@ -360,3 +358,4 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     </div>
   );
 };
+

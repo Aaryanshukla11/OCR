@@ -203,7 +203,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -214,17 +214,17 @@ export function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Error Notification */}
         {errorMessage && (
-          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-xl flex items-center justify-between shadow-lg">
+          <div className="bg-zinc-900 border border-zinc-800 text-rose-400 p-4 rounded-xl flex items-center justify-between shadow-xs">
             <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider">Engine Processing Error</p>
-                <p className="text-xs font-mono">{errorMessage}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-200">Engine Error</p>
+                <p className="text-xs font-mono text-zinc-400">{errorMessage}</p>
               </div>
             </div>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 px-3 py-1 rounded"
+              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1 rounded-md border border-zinc-700 transition-colors"
             >
               Dismiss
             </button>
@@ -236,40 +236,40 @@ export function App() {
           <div className="space-y-6">
             
             {/* Mode Switcher Bar */}
-            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="bg-zinc-900/60 border border-zinc-800 p-2.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
                   Engine Mode:
                 </span>
                 
-                <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <div className="flex items-center bg-zinc-950 p-1 rounded-lg border border-zinc-800">
                   <button
                     onClick={() => setEngineMode('ocr')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       engineMode === 'ocr'
-                        ? 'bg-indigo-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <FileCheck className="w-3.5 h-3.5" />
-                    <span>1. Production OCR Mode</span>
+                    <span>1. Production OCR</span>
                   </button>
 
                   <button
                     onClick={() => setEngineMode('eval')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       engineMode === 'eval'
-                        ? 'bg-indigo-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
+                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <TestTube className="w-3.5 h-3.5" />
-                    <span>2. Benchmark Evaluation Mode</span>
+                    <span>2. Benchmark Evaluation</span>
                   </button>
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-400 font-mono">
+              <div className="text-[11px] text-zinc-500 font-mono">
                 {engineMode === 'ocr'
                   ? 'Standard Document & Image Text Extraction'
                   : 'Ground Truth Accuracy Benchmark (CER / WER Metrics)'}
@@ -287,24 +287,24 @@ export function App() {
 
             {/* Results Section */}
             {ocrData && imagePreviewUrl && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 
                 {/* Metrics Card Bar */}
                 <MetricsCard data={ocrData} />
 
                 {/* View Mode Selector Header */}
-                <div className="flex items-center justify-between bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-800">
-                  <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
+                <div className="flex items-center justify-between bg-zinc-900/60 px-4 py-2 rounded-xl border border-zinc-800">
+                  <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">
                     Document Workspace ({ocrData.filename})
                   </span>
 
-                  <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <div className="flex items-center space-x-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
                     <button
                       onClick={() => setViewMode('inspector')}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         viewMode === 'inspector'
-                          ? 'bg-indigo-600 text-white shadow'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
                       <LayoutGrid className="w-3.5 h-3.5" />
@@ -313,10 +313,10 @@ export function App() {
 
                     <button
                       onClick={() => setViewMode('comparison')}
-                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-all ${
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         viewMode === 'comparison'
-                          ? 'bg-indigo-600 text-white shadow'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                          : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
                       <Columns className="w-3.5 h-3.5" />
@@ -348,16 +348,16 @@ export function App() {
                       />
                     </div>
 
-                    {/* Right Column: Tabbed Workspace Sidebar (Detection Regions / Find in Image / Extracted Text) */}
+                    {/* Right Column: Tabbed Workspace Sidebar */}
                     <div className="flex flex-col space-y-4 min-h-[550px]">
                       {/* Sidebar Tab Header */}
-                      <div className="flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                      <div className="flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800">
                         <button
                           onClick={() => setRightPanelTab('regions')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'regions'
-                              ? 'bg-indigo-600 text-white shadow'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-950/40'
+                              ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
                           }`}
                         >
                           <Target className="w-3.5 h-3.5" />
@@ -366,16 +366,16 @@ export function App() {
 
                         <button
                           onClick={() => setRightPanelTab('find')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg text-xs font-semibold transition-all relative ${
+                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'find'
-                              ? 'bg-amber-600 text-white shadow'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-950/40'
+                              ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
                           }`}
                         >
                           <FileSearch className="w-3.5 h-3.5" />
                           <span>Find</span>
                           {matchingRegions.length > 0 && (
-                            <span className="ml-1 text-[10px] bg-amber-400/20 text-amber-300 font-mono px-1.5 py-0.2 rounded-full border border-amber-400/40">
+                            <span className="ml-1 text-[10px] bg-zinc-800 text-zinc-300 font-mono px-1.5 py-0.2 rounded border border-zinc-700">
                               {matchingRegions.length}
                             </span>
                           )}
@@ -383,10 +383,10 @@ export function App() {
 
                         <button
                           onClick={() => setRightPanelTab('text')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'text'
-                              ? 'bg-indigo-600 text-white shadow'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-950/40'
+                              ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
                           }`}
                         >
                           <FileText className="w-3.5 h-3.5" />
@@ -453,13 +453,13 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 py-4 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 space-y-2 sm:space-y-0 font-mono">
+      <footer className="bg-zinc-950 border-t border-zinc-800 py-4 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 space-y-2 sm:space-y-0 font-mono">
           <div>
-            OUR OCR ENGINE v1.0.0 • Decoupled Model Layer Architecture
+            OCR ENGINE v1.0.0
           </div>
-          <div className="flex items-center space-x-4 text-slate-400">
-            <span>Model: PaddleOCR 3.7.0</span>
+          <div className="flex items-center space-x-3 text-zinc-500">
+            <span>PaddleOCR 3.7.0</span>
             <span>•</span>
             <span>REST API Active</span>
           </div>
@@ -470,3 +470,4 @@ export function App() {
 }
 
 export default App;
+
