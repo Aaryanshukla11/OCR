@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Navbar } from './components/Navbar';
+import { Navbar, type ActiveTabType } from './components/Navbar';
 import { UploadZone } from './components/UploadZone';
 import { MetricsCard } from './components/MetricsCard';
 import { DocumentViewer } from './components/DocumentViewer';
@@ -10,11 +10,14 @@ import { ComparisonView } from './components/ComparisonView';
 import { AccuracyEvalPanel } from './components/AccuracyEvalPanel';
 import { CategoryBrowser } from './components/CategoryBrowser';
 import { HistoryView } from './components/HistoryView';
+import { IntelligencePanel } from './components/IntelligencePanel';
+import { DocumentExplorer } from './components/DocumentExplorer';
+import { QueryInterface } from './components/QueryInterface';
 import type { OCRResponse } from './types';
-import { LayoutGrid, Columns, AlertCircle, FileCheck, TestTube, Target, FileSearch, FileText } from 'lucide-react';
+import { LayoutGrid, Columns, AlertCircle, FileCheck, TestTube, Target, FileSearch, FileText, Cpu } from 'lucide-react';
 
-export function App() {
-  const [activeTab, setActiveTab] = useState<'tester' | 'history' | 'categories'>('tester');
+export default function App() {
+  const [activeTab, setActiveTab] = useState<ActiveTabType>('tester');
   const [engineMode, setEngineMode] = useState<'ocr' | 'eval'>('ocr');
   const [viewMode, setViewMode] = useState<'inspector' | 'comparison'>('inspector');
   
@@ -29,8 +32,8 @@ export function App() {
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
 
-  // Right sidebar tab state: 'regions' | 'find' | 'text'
-  const [rightPanelTab, setRightPanelTab] = useState<'regions' | 'find' | 'text'>('regions');
+  // Right sidebar tab state: 'intelligence' | 'regions' | 'find' | 'text'
+  const [rightPanelTab, setRightPanelTab] = useState<'intelligence' | 'regions' | 'find' | 'text'>('intelligence');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -50,23 +53,113 @@ export function App() {
           setBackendDevice(data.device || 'CPU');
         }
       })
-      .catch((err) => {
-        console.error('Health check failed:', err);
-        setIsBackendHealthy(false);
-      });
+      .catch(() => setIsBackendHealthy(false));
   }, []);
 
-  // Calculate search matches across all pages
-  const matchingRegions = useMemo(() => {
-    if (!ocrData || !searchQuery.trim()) return [];
-    const query = isMatchCase ? searchQuery : searchQuery.toLowerCase();
-    const matches: SearchMatchItem[] = [];
+  const handleInspectStoredDocument = async (docId: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/documents/${docId}`);
+      if (!res.ok) throw new Error('Failed to load stored document intelligence');
+      const data = await res.json();
+      
+      setOcrData({
+        filename: data.filename,
+        file_type: data.document_type.toUpperCase(),
+        total_pages: data.total_pages,
+        processing_time: 0.1,
+        device: backendDevice,
+        average_confidence: data.average_confidence,
+        total_regions: data.structured_json?.elements?.length || 10,
+        pages: data.structured_json?.pages || [],
+        aggregated_text: data.raw_text,
+        accuracy: { available: false, message: 'Stored document' },
+        status: 'success',
+        intelligence: data.structured_json
+      });
 
-    ocrData.pages?.forEach((page, pageIdx) => {
-      page.regions?.forEach((region) => {
-        const text = isMatchCase ? region.text : region.text.toLowerCase();
-        if (text.includes(query)) {
-          matches.push({ pageIndex: pageIdx, region });
+      if (data.structured_json?.pages?.[0]?.page_image) {
+        setImagePreviewUrl(data.structured_json.pages[0].page_image);
+      }
+
+      setActiveTab('tester');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setOcrData(null);
+    setErrorMessage(null);
+    setActivePageIndex(0);
+    setSelectedRegionId(null);
+    setSearchQuery('');
+    setActiveMatchIndex(0);
+
+    const objectUrl = URL.createObjectURL(file);
+    setImagePreviewUrl(objectUrl);
+  };
+
+  const handleRunOcr = async () => {
+    const fileToProcess = selectedFile;
+    if (!fileToProcess) {
+      setErrorMessage('Please select a document file first.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+    setOcrData(null);
+    setActivePageIndex(0);
+    setSelectedRegionId(null);
+    setSearchQuery('');
+    setActiveMatchIndex(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', fileToProcess);
+
+      if (engineMode === 'eval' && groundTruthText.trim()) {
+        formData.append('ground_truth', groundTruthText.trim());
+      }
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'OCR processing failed.');
+      }
+
+      const resultData: OCRResponse = await response.json();
+      setOcrData(resultData);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'An unexpected error occurred during OCR processing.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Compute matching regions for search functionality
+  const matchingRegions = useMemo<SearchMatchItem[]>(() => {
+    if (!ocrData || !searchQuery.trim()) return [];
+
+    const matches: SearchMatchItem[] = [];
+    const queryStr = isMatchCase ? searchQuery : searchQuery.toLowerCase();
+
+    ocrData.pages.forEach((page, pageIdx) => {
+      page.regions.forEach((region) => {
+        const regionText = isMatchCase ? region.text : region.text.toLowerCase();
+        if (regionText.includes(queryStr)) {
+          matches.push({
+            pageIndex: pageIdx,
+            region: region,
+          });
         }
       });
     });
@@ -74,136 +167,50 @@ export function App() {
     return matches;
   }, [ocrData, searchQuery, isMatchCase]);
 
-  // When search query changes, reset match index and select first match
-  useEffect(() => {
-    setActiveMatchIndex(0);
-    if (matchingRegions.length > 0) {
-      const firstMatch = matchingRegions[0];
-      setActivePageIndex(firstMatch.pageIndex);
-      setSelectedRegionId(firstMatch.region.id);
-    }
-  }, [searchQuery, isMatchCase]);
-
-  // Compute set of region IDs matching on current page
   const matchingRegionIds = useMemo(() => {
-    const set = new Set<number>();
-    matchingRegions.forEach((m) => {
-      if (m.pageIndex === activePageIndex) {
-        set.add(m.region.id);
-      }
-    });
-    return set;
-  }, [matchingRegions, activePageIndex]);
+    return new Set(matchingRegions.map((m) => m.region.id));
+  }, [matchingRegions]);
 
-  const activeMatch = matchingRegions[activeMatchIndex];
-  const activeMatchRegionId =
-    activeMatch && activeMatch.pageIndex === activePageIndex
-      ? activeMatch.region.id
-      : null;
+  const activeMatchRegionId = useMemo(() => {
+    if (matchingRegions.length === 0) return null;
+    const clampedIndex = Math.min(activeMatchIndex, matchingRegions.length - 1);
+    return matchingRegions[clampedIndex]?.region.id || null;
+  }, [matchingRegions, activeMatchIndex]);
+
+  const handleSearchQueryChange = (query: string) => {
+    setSearchQuery(query);
+    setActiveMatchIndex(0);
+    if (query.trim().length > 0) {
+      setRightPanelTab('find');
+    }
+  };
 
   const handleNavigateNextMatch = () => {
     if (matchingRegions.length === 0) return;
     const nextIdx = (activeMatchIndex + 1) % matchingRegions.length;
     setActiveMatchIndex(nextIdx);
-    const match = matchingRegions[nextIdx];
-    if (match) {
-      setActivePageIndex(match.pageIndex);
-      setSelectedRegionId(match.region.id);
+
+    const targetPage = matchingRegions[nextIdx].pageIndex;
+    if (targetPage !== activePageIndex) {
+      setActivePageIndex(targetPage);
     }
+    setSelectedRegionId(matchingRegions[nextIdx].region.id);
   };
 
   const handleNavigatePrevMatch = () => {
     if (matchingRegions.length === 0) return;
     const prevIdx = (activeMatchIndex - 1 + matchingRegions.length) % matchingRegions.length;
     setActiveMatchIndex(prevIdx);
-    const match = matchingRegions[prevIdx];
-    if (match) {
-      setActivePageIndex(match.pageIndex);
-      setSelectedRegionId(match.region.id);
+
+    const targetPage = matchingRegions[prevIdx].pageIndex;
+    if (targetPage !== activePageIndex) {
+      setActivePageIndex(targetPage);
     }
-  };
-
-  const handleSearchQueryChange = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      setRightPanelTab('find');
-    }
-  };
-
-  const handleRunOcr = async (fileToProcess: File, gtText?: string) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSelectedFile(fileToProcess);
-    
-    // Create preview URL
-    const objectUrl = URL.createObjectURL(fileToProcess);
-    setImagePreviewUrl(objectUrl);
-
-    const formData = new FormData();
-    formData.append('file', fileToProcess);
-    
-    // Pass ground truth if in evaluation mode or explicitly provided
-    if ((engineMode === 'eval' || gtText) && (gtText || groundTruthText).trim()) {
-      formData.append('ground_truth', (gtText || groundTruthText).trim());
-    }
-
-    try {
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-        throw new Error(errorData.detail || 'OCR Engine processing failed');
-      }
-
-      const result: OCRResponse = await response.json();
-      setOcrData(result);
-      setActivePageIndex(0);
-      setSelectedRegionId(null);
-      setSearchQuery('');
-    } catch (err: any) {
-      console.error('OCR Engine API Error:', err);
-      setErrorMessage(err.message || 'An error occurred while running OCR Engine.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSelectSampleFromCategory = async (category: string, filename: string) => {
-    setActiveTab('tester');
-    setEngineMode('eval');
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    const fileUrl = `/api/test-data/${category}/${filename}`;
-    const gtUrl = `/api/test-data-gt/${category}/${filename}`;
-
-    try {
-      const [fileRes, gtRes] = await Promise.all([
-        fetch(fileUrl),
-        fetch(gtUrl).then((r) => r.json()).catch(() => ({ ground_truth: null })),
-      ]);
-
-      if (!fileRes.ok) throw new Error('Failed to load sample file');
-      
-      const blob = await fileRes.blob();
-      const sampleFile = new File([blob], filename, { type: blob.type || 'image/png' });
-      const gtContent = gtRes.ground_truth || '';
-
-      setSelectedFile(sampleFile);
-      setGroundTruthText(gtContent);
-      
-      await handleRunOcr(sampleFile, gtContent);
-    } catch (err: any) {
-      setErrorMessage(`Failed to load category sample: ${err.message}`);
-      setIsLoading(false);
-    }
+    setSelectedRegionId(matchingRegions[prevIdx].region.id);
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans antialiased selection:bg-zinc-800 selection:text-zinc-100">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -212,91 +219,106 @@ export function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Error Notification */}
-        {errorMessage && (
-          <div className="bg-zinc-900 border border-zinc-800 text-rose-400 p-4 rounded-xl flex items-center justify-between shadow-xs">
-            <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-rose-500 flex-shrink-0" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-200">Engine Error</p>
-                <p className="text-xs font-mono text-zinc-400">{errorMessage}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1 rounded-md border border-zinc-700 transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
+        {/* Document Explorer Tab */}
+        {activeTab === 'explorer' && (
+          <DocumentExplorer onSelectDocument={handleInspectStoredDocument} />
         )}
 
-        {/* Tab 1: OCR Engine Main Dashboard */}
+        {/* Natural Language Query Engine Tab */}
+        {activeTab === 'query' && (
+          <QueryInterface onSelectDocument={handleInspectStoredDocument} />
+        )}
+
+        {/* Benchmark Categories Tab */}
+        {activeTab === 'categories' && (
+          <CategoryBrowser
+            onSelectSampleFile={(fileUrl, filename) => {
+              fetch(fileUrl)
+                .then((r) => r.blob())
+                .then((blob) => {
+                  const f = new File([blob], filename, { type: blob.type });
+                  handleFileSelect(f);
+                  setActiveTab('tester');
+                });
+            }}
+          />
+        )}
+
+        {/* Execution Log Tab */}
+        {activeTab === 'history' && <HistoryView />}
+
+        {/* Primary Workspace Tab */}
         {activeTab === 'tester' && (
           <div className="space-y-6">
-            
-            {/* Mode Switcher Bar */}
-            <div className="bg-zinc-900/60 border border-zinc-800 p-2.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono">
-                  Engine Mode:
-                </span>
-                
-                <div className="flex items-center bg-zinc-950 p-1 rounded-lg border border-zinc-800">
-                  <button
-                    onClick={() => setEngineMode('ocr')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      engineMode === 'ocr'
-                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <FileCheck className="w-3.5 h-3.5" />
-                    <span>1. Production OCR</span>
-                  </button>
-
-                  <button
-                    onClick={() => setEngineMode('eval')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      engineMode === 'eval'
-                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <TestTube className="w-3.5 h-3.5" />
-                    <span>2. Benchmark Evaluation</span>
-                  </button>
-                </div>
+            {/* Top Workspace Header */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100 tracking-tight font-mono">
+                  Document Intelligence & OCR Workspace
+                </h2>
+                <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                  Process arbitrary documents with PaddleOCR, extract layout, tables, dynamic entities, and save to SQLite.
+                </p>
               </div>
 
-              <div className="text-[11px] text-zinc-500 font-mono">
-                {engineMode === 'ocr'
-                  ? 'Standard Document & Image Text Extraction'
-                  : 'Ground Truth Accuracy Benchmark (CER / WER Metrics)'}
+              {/* Engine Mode Toggle */}
+              <div className="flex items-center space-x-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800 self-start md:self-auto">
+                <button
+                  onClick={() => setEngineMode('ocr')}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    engineMode === 'ocr'
+                      ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <FileCheck className="w-3.5 h-3.5" />
+                  <span>Standard OCR & Intelligence</span>
+                </button>
+
+                <button
+                  onClick={() => setEngineMode('eval')}
+                  className={`flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                    engineMode === 'eval'
+                      ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <TestTube className="w-3.5 h-3.5" />
+                  <span>CER/WER Accuracy Benchmark</span>
+                </button>
               </div>
             </div>
 
-            {/* Upload Area */}
+            {/* Document Upload Zone */}
             <UploadZone
-              onFileSelect={(file, gt) => handleRunOcr(file, gt || groundTruthText)}
-              isLoading={isLoading}
               selectedFile={selectedFile}
+              onFileSelect={handleFileSelect}
+              onRunOcr={handleRunOcr}
+              isLoading={isLoading}
               groundTruthText={groundTruthText}
               setGroundTruthText={setGroundTruthText}
             />
 
-            {/* Results Section */}
+            {/* Error Feedback Display */}
+            {errorMessage && (
+              <div className="p-4 bg-zinc-900 border border-red-500/40 rounded-xl text-red-400 text-xs font-mono flex items-center space-x-2 shadow-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {/* OCR Processing Output Display */}
             {ocrData && imagePreviewUrl && (
               <div className="space-y-6">
-                
-                {/* Metrics Card Bar */}
+                {/* Executive Summary Metrics Card */}
                 <MetricsCard data={ocrData} />
 
-                {/* View Mode Selector Header */}
-                <div className="flex items-center justify-between bg-zinc-900/60 px-4 py-2 rounded-xl border border-zinc-800">
-                  <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider font-mono">
-                    Document Workspace ({ocrData.filename})
-                  </span>
+                {/* View Mode Bar */}
+                <div className="flex items-center justify-between bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800">
+                  <div className="text-xs font-semibold text-zinc-300 font-mono flex items-center space-x-2">
+                    <LayoutGrid className="w-4 h-4 text-zinc-400" />
+                    <span>DOCUMENT ANALYSIS VIEW</span>
+                  </div>
 
                   <div className="flex items-center space-x-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
                     <button
@@ -353,8 +375,20 @@ export function App() {
                       {/* Sidebar Tab Header */}
                       <div className="flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800">
                         <button
+                          onClick={() => setRightPanelTab('intelligence')}
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            rightPanelTab === 'intelligence'
+                              ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          <Cpu className="w-3.5 h-3.5" />
+                          <span>Intelligence</span>
+                        </button>
+
+                        <button
                           onClick={() => setRightPanelTab('regions')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'regions'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -366,7 +400,7 @@ export function App() {
 
                         <button
                           onClick={() => setRightPanelTab('find')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'find'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -383,7 +417,7 @@ export function App() {
 
                         <button
                           onClick={() => setRightPanelTab('text')}
-                          className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'text'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -396,6 +430,14 @@ export function App() {
 
                       {/* Active Sidebar Tab View */}
                       <div className="flex-1">
+                        {rightPanelTab === 'intelligence' && (
+                          <IntelligencePanel
+                            data={ocrData}
+                            selectedRegionId={selectedRegionId}
+                            setSelectedRegionId={setSelectedRegionId}
+                          />
+                        )}
+
                         {rightPanelTab === 'regions' && (
                           <DetectionResultsPanel
                             pageResult={ocrData.pages[activePageIndex] || ocrData.pages[0]}
@@ -440,34 +482,19 @@ export function App() {
             )}
           </div>
         )}
-
-        {/* Tab 2: Test Dataset Categories */}
-        {activeTab === 'categories' && (
-          <CategoryBrowser onSelectSampleFile={handleSelectSampleFromCategory} />
-        )}
-
-        {/* Tab 3: Local Test History */}
-        {activeTab === 'history' && (
-          <HistoryView />
-        )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-zinc-950 border-t border-zinc-800 py-4 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 space-y-2 sm:space-y-0 font-mono">
+      {/* Modern Sleek Minimalist Footer */}
+      <footer className="border-t border-zinc-800/80 bg-zinc-950 py-4 text-center text-xs text-zinc-500 font-mono">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            OCR ENGINE v1.0.0
+            Document Intelligence Platform Engine • PaddleOCR 3.7.0 • PPStructureV3 Architecture
           </div>
-          <div className="flex items-center space-x-3 text-zinc-500">
-            <span>PaddleOCR 3.7.0</span>
-            <span>•</span>
-            <span>REST API Active</span>
+          <div className="text-zinc-600">
+            Powered by Antigravity AI
           </div>
         </div>
       </footer>
     </div>
   );
 }
-
-export default App;
-

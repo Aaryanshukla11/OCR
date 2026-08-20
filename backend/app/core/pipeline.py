@@ -32,6 +32,8 @@ from app.postprocessing.postprocessor import Postprocessor
 from app.validation.validator import InputValidator, ValidationError
 from app.models.paddleocr.provider import PaddleOCRProvider
 from app.services.evaluator import compute_accuracy_metrics
+from app.intelligence.understanding import DocumentUnderstandingEngine
+from app.services.database import DatabaseService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("OCRPipeline")
@@ -65,6 +67,9 @@ class OCRPipeline:
         else:
             logger.warning(f"Unknown provider '{provider_type}', falling back to PaddleOCRProvider.")
             self.model_provider = PaddleOCRProvider.get_instance(lang=config.ocr.lang)
+
+        # Initialize Document Understanding Engine
+        self.understanding_engine = DocumentUnderstandingEngine()
             
         logger.info(f"OCRPipeline active with provider '{self.model_provider.provider_name}' on device '{self.model_provider.device}'")
 
@@ -161,16 +166,11 @@ class OCRPipeline:
         # Step 6: Evaluation
         accuracy_dict = compute_accuracy_metrics(aggregated_text, ground_truth)
         
-        logger.info(
-            f"OCR pipeline completed for '{filename}': {total_regions_count} regions, "
-            f"{doc_avg_conf}% avg confidence in {elapsed_ms} ms on {self.model_provider.device}"
-        )
-        
-        return OCRDocumentResult(
+        ocr_result = OCRDocumentResult(
             document=DocumentInfo(
                 filename=filename,
                 page_count=page_count,
-                file_type=ext[1:].upper()
+                file_type=ext[1:].upper() if ext else "UNKNOWN"
             ),
             pages=pages_list,
             processing=ProcessingMetadata(
@@ -186,3 +186,19 @@ class OCRPipeline:
             accuracy=AccuracyMetrics(**accuracy_dict),
             status="success"
         )
+        
+        # Step 7: Document Understanding & Dynamic Intelligence Extraction
+        try:
+            intel_result = self.understanding_engine.analyze_document(ocr_result)
+            DatabaseService.save_document(
+                intel_result=intel_result,
+                total_pages=page_count,
+                average_confidence=doc_avg_conf,
+                raw_text=aggregated_text
+            )
+            # Attach intelligence payload to OCRDocumentResult object
+            ocr_result.intelligence = intel_result.dict()
+        except Exception as err:
+            logger.error(f"Document Understanding analysis failed: {err}")
+            
+        return ocr_result

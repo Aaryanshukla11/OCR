@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { UploadCloud, CheckCircle, Play, FileCode, Layers } from 'lucide-react';
 
 interface UploadZoneProps {
-  onFileSelect: (file: File, groundTruth?: string) => void;
+  onFileSelect: (file: File) => void;
+  onRunOcr: () => void;
   isLoading: boolean;
   selectedFile: File | null;
   groundTruthText: string;
@@ -11,6 +12,7 @@ interface UploadZoneProps {
 
 export const UploadZone: React.FC<UploadZoneProps> = ({
   onFileSelect,
+  onRunOcr,
   isLoading,
   selectedFile,
   groundTruthText,
@@ -51,7 +53,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       alert(`File type ${ext} is not supported. Please upload PNG, JPG, JPEG, WEBP, or PDF.`);
       return;
     }
-    onFileSelect(file, groundTruthText);
+    onFileSelect(file);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -166,7 +168,7 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
       <div className="mt-4 flex justify-end">
         <button
           disabled={!selectedFile || isLoading}
-          onClick={() => selectedFile && onFileSelect(selectedFile, groundTruthText)}
+          onClick={() => selectedFile && onRunOcr()}
           className={`w-full sm:w-auto px-5 py-2 rounded-md text-xs font-semibold flex items-center justify-center space-x-2 transition-colors ${
             !selectedFile || isLoading
               ? 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800'

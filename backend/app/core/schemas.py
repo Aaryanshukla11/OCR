@@ -45,4 +45,5 @@ class OCRDocumentResult(BaseModel):
     average_confidence: float
     total_regions: int
     accuracy: AccuracyMetrics
+    intelligence: Optional[Any] = None
     status: str = "success"

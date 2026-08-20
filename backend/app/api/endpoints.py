@@ -42,27 +42,45 @@ async def run_ocr(
             ground_truth=ground_truth
         )
         
-        # Record in test history
-        add_history_entry(
-            filename=filename,
-            processing_time=doc_result.processing.processing_time_sec,
-            total_regions=doc_result.total_regions,
-            average_confidence=doc_result.average_confidence,
-            device=doc_result.processing.device,
-            status="success",
-            file_type=doc_result.document.file_type,
-            pages_count=doc_result.document.page_count
-        )
-        
-        # Format response for frontend compatibility & standardized schema
-        response_data = doc_result.dict()
-        # Add backward-compatibility alias fields expected by existing UI
-        response_data["processing_time"] = doc_result.processing.processing_time_sec
-        response_data["device"] = doc_result.processing.device
-        response_data["filename"] = doc_result.document.filename
-        response_data["file_type"] = doc_result.document.file_type
-        response_data["total_pages"] = doc_result.document.page_count
-        
+        if isinstance(doc_result, dict):
+            response_data = doc_result
+            proc = doc_result.get("processing", {})
+            doc = doc_result.get("document", {})
+            
+            add_history_entry(
+                filename=filename,
+                processing_time=proc.get("processing_time_sec", 0.0),
+                total_regions=doc_result.get("total_regions", 0),
+                average_confidence=doc_result.get("average_confidence", 0.0),
+                device=proc.get("device", "CPU"),
+                status="success",
+                file_type=doc.get("file_type", "UNKNOWN"),
+                pages_count=doc.get("page_count", 1)
+            )
+            
+            response_data["processing_time"] = proc.get("processing_time_sec", 0.0)
+            response_data["device"] = proc.get("device", "CPU")
+            response_data["filename"] = doc.get("filename", filename)
+            response_data["file_type"] = doc.get("file_type", "UNKNOWN")
+            response_data["total_pages"] = doc.get("page_count", 1)
+        else:
+            response_data = doc_result.dict()
+            add_history_entry(
+                filename=filename,
+                processing_time=doc_result.processing.processing_time_sec,
+                total_regions=doc_result.total_regions,
+                average_confidence=doc_result.average_confidence,
+                device=doc_result.processing.device,
+                status="success",
+                file_type=doc_result.document.file_type,
+                pages_count=doc_result.document.page_count
+            )
+            response_data["processing_time"] = doc_result.processing.processing_time_sec
+            response_data["device"] = doc_result.processing.device
+            response_data["filename"] = doc_result.document.filename
+            response_data["file_type"] = doc_result.document.file_type
+            response_data["total_pages"] = doc_result.document.page_count
+            
         return JSONResponse(content=response_data)
         
     except ValidationError as ve:
@@ -133,3 +151,48 @@ def get_ground_truth_content(category: str, filename: str):
         return {"ground_truth": None}
     with open(gt_path, "r", encoding="utf-8") as f:
         return {"ground_truth": f.read()}
+
+# ==========================================
+# Document Intelligence & Query REST APIs
+# ==========================================
+
+from pydantic import BaseModel
+
+class QueryApiRequest(BaseModel):
+    query: str
+
+@router.get("/documents")
+def list_stored_documents(document_type: str = None, search: str = None):
+    """Returns stored documents list from SQLite database."""
+    from app.services.database import DatabaseService
+    docs = DatabaseService.get_documents(document_type=document_type, search_query=search)
+    return {"documents": [d.dict() for d in docs]}
+
+@router.get("/documents/{doc_id}")
+def get_stored_document_detail(doc_id: str):
+    """Retrieves full detailed document intelligence payload from SQLite."""
+    from app.services.database import DatabaseService
+    doc_detail = DatabaseService.get_document_by_id(doc_id)
+    if not doc_detail:
+        raise HTTPException(status_code=404, detail=f"Document with ID '{doc_id}' not found")
+    return doc_detail
+
+@router.delete("/documents/{doc_id}")
+def delete_stored_document(doc_id: str):
+    """Deletes stored document from SQLite database."""
+    from app.services.database import DatabaseService
+    success = DatabaseService.delete_document(doc_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Document with ID '{doc_id}' not found")
+    return {"status": "success", "message": f"Document '{doc_id}' deleted successfully"}
+
+@router.post("/query")
+def execute_natural_language_query(payload: QueryApiRequest):
+    """Translates user natural language question into structured query plan & executes SQL search."""
+    from app.services.query_engine import DocumentQueryEngine
+    if not payload.query or not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Query text cannot be empty")
+        
+    response = DocumentQueryEngine.execute_query(payload.query)
+    return response.dict()
+

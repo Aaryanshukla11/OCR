@@ -1,9 +1,11 @@
 import React from 'react';
-import { Cpu, Zap, Activity, FileSearch, Layers } from 'lucide-react';
+import { Cpu, Zap, Activity, FileSearch, Layers, Database, MessageSquare } from 'lucide-react';
+
+export type ActiveTabType = 'tester' | 'explorer' | 'query' | 'categories' | 'history';
 
 interface NavbarProps {
-  activeTab: 'tester' | 'history' | 'categories';
-  setActiveTab: (tab: 'tester' | 'history' | 'categories') => void;
+  activeTab: ActiveTabType;
+  setActiveTab: (tab: ActiveTabType) => void;
   device: string;
   isBackendHealthy: boolean;
 }
@@ -29,10 +31,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h1 className="text-sm font-semibold text-zinc-100 tracking-tight font-sans">
-                  OCR Engine
+                  Document Intelligence Platform
                 </h1>
                 <span className="text-[10px] bg-zinc-900 text-zinc-400 border border-zinc-800 px-1.5 py-0.5 rounded font-mono">
-                  v1.0.0
+                  v2.0
                 </span>
               </div>
             </div>
@@ -50,6 +52,30 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Layers className="w-3.5 h-3.5" />
               <span>Workspace</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('explorer')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                activeTab === 'explorer'
+                  ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Document Explorer</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('query')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                activeTab === 'query'
+                  ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>NL Query</span>
             </button>
 
             <button
@@ -99,4 +125,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
-
