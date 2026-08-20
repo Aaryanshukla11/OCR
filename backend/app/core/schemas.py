@@ -20,6 +20,8 @@ class PageResult(BaseModel):
     regions: List[RegionResult]
     full_text: str
     average_confidence: float
+    page_image: Optional[str] = None
+
 
 class ProcessingMetadata(BaseModel):
     processing_time_ms: float

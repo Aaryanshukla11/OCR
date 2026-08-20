@@ -8,6 +8,9 @@ interface ComparisonViewProps {
 }
 
 export const ComparisonView: React.FC<ComparisonViewProps> = ({ imageSrc, data }) => {
+  const displaySrc = data.pages?.[0]?.page_image || imageSrc;
+  const isRawPdf = !data.pages?.[0]?.page_image && (imageSrc.includes('.pdf') || imageSrc.startsWith('blob:'));
+
   return (
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-xs">
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
@@ -32,13 +35,24 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ imageSrc, data }
           </div>
 
           <div className="flex-1 min-h-[300px] flex items-center justify-center bg-zinc-900/40 rounded p-2 overflow-hidden">
-            <img
-              src={imageSrc}
-              alt="Original Document"
-              className="max-w-full max-h-[450px] object-contain rounded border border-zinc-800"
-            />
+            {isRawPdf ? (
+              <object
+                data={imageSrc}
+                type="application/pdf"
+                className="w-full h-[400px] rounded border border-zinc-800 bg-zinc-900"
+              >
+                <embed src={imageSrc} type="application/pdf" className="w-full h-full" />
+              </object>
+            ) : (
+              <img
+                src={displaySrc}
+                alt="Original Document"
+                className="max-w-full max-h-[450px] object-contain rounded border border-zinc-800"
+              />
+            )}
           </div>
         </div>
+
 
         {/* Panel 2: OCR Extracted Text & Ground Truth */}
         <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 flex flex-col">

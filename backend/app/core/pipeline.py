@@ -1,8 +1,24 @@
 import time
 import logging
 import os
+import io
+import base64
 import numpy as np
 from typing import List, Optional
+from PIL import Image
+
+def _np_to_base64_jpeg(np_img: np.ndarray, quality: int = 85) -> str:
+    try:
+        pil_img = Image.fromarray(np_img)
+        buffer = io.BytesIO()
+        pil_img.save(buffer, format="JPEG", quality=quality)
+        b64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/jpeg;base64,{b64_str}"
+    except Exception as e:
+        logger.error(f"Failed to encode base64 image: {e}")
+    return ""
+
+
 
 from app.core.config import AppConfig, load_config
 from app.core.schemas import (
@@ -88,13 +104,15 @@ class OCRPipeline:
                 page_text = "\n".join([r.text for r in region_objects])
                 page_avg_conf = self.postprocessor.calculate_confidence(final_regions_dict)
                 
+                page_b64 = _np_to_base64_jpeg(raw_np_img)
                 pages_list.append(PageResult(
                     page_number=page_num,
                     width=orig_w,
                     height=orig_h,
                     regions=region_objects,
                     full_text=page_text,
-                    average_confidence=page_avg_conf
+                    average_confidence=page_avg_conf,
+                    page_image=page_b64
                 ))
         else:
             page_count = 1
@@ -112,6 +130,7 @@ class OCRPipeline:
             region_objects = [RegionResult(**r) for r in final_regions_dict]
             page_text = "\n".join([r.text for r in region_objects])
             page_avg_conf = self.postprocessor.calculate_confidence(final_regions_dict)
+            page_b64 = _np_to_base64_jpeg(raw_np_img)
             
             pages_list.append(PageResult(
                 page_number=1,
@@ -119,8 +138,10 @@ class OCRPipeline:
                 height=orig_h,
                 regions=region_objects,
                 full_text=page_text,
-                average_confidence=page_avg_conf
+                average_confidence=page_avg_conf,
+                page_image=page_b64
             ))
+
             
         elapsed_sec = time.time() - t0
         elapsed_ms = round(elapsed_sec * 1000, 2)

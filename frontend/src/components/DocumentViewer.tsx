@@ -48,6 +48,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const currentPage = pageResults[activePageIndex] || pageResults[0];
   const regions = currentPage?.regions || [];
+  const currentImageSrc = currentPage?.page_image || imageSrc;
+  const isRawPdfBlob = !currentPage?.page_image && (imageSrc.includes('.pdf') || (imageSrc.startsWith('blob:') && !currentPage));
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 4));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
@@ -95,6 +97,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   };
 
   const hasSearch = searchQuery.trim().length > 0;
+
 
   return (
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden shadow-xs flex flex-col h-full">
@@ -269,13 +272,24 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           }}
           className="relative inline-block"
         >
-          <img
-            ref={imgRef}
-            src={imageSrc}
-            alt="Original Document"
-            onLoad={handleImageLoad}
-            className="max-w-full max-h-[600px] object-contain rounded border border-zinc-800 pointer-events-none"
-          />
+          {isRawPdfBlob ? (
+            <object
+              data={imageSrc}
+              type="application/pdf"
+              className="w-[650px] h-[550px] max-w-full rounded border border-zinc-800 bg-zinc-900"
+            >
+              <embed src={imageSrc} type="application/pdf" className="w-full h-full" />
+            </object>
+          ) : (
+            <img
+              ref={imgRef}
+              src={currentImageSrc}
+              alt="Original Document"
+              onLoad={handleImageLoad}
+              className="max-w-full max-h-[600px] object-contain rounded border border-zinc-800 pointer-events-none"
+            />
+          )}
+
 
           {showBoxes && imageDimensions.naturalWidth > 0 && (
             <svg

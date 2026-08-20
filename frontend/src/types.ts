@@ -11,6 +11,7 @@ export interface PageOCRResult {
   regions: BoundingBoxRegion[];
   extracted_text: string;
   average_confidence: number;
+  page_image?: string;
 }
 
 export interface AccuracyMetrics {

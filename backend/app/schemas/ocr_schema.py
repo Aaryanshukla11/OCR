@@ -13,6 +13,8 @@ class PageOCRResult(BaseModel):
     regions: List[BoundingBoxRegion]
     extracted_text: str
     average_confidence: float
+    page_image: Optional[str] = None
+
 
 class AccuracyMetrics(BaseModel):
     available: bool
