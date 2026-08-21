@@ -22,6 +22,12 @@ class DocumentUnderstandingEngine:
 
     def __init__(self):
         self._init_ppstructure()
+        try:
+            from app.intelligence.ollama_client import OllamaUnderstandingClient
+            self.ollama_client = OllamaUnderstandingClient()
+        except Exception as e:
+            logger.warning(f"Could not initialize Ollama client: {e}")
+            self.ollama_client = None
 
     def _init_ppstructure(self):
         """Initializes PPStructureV3 adapter if available in current environment."""
@@ -37,46 +43,151 @@ class DocumentUnderstandingEngine:
 
     def analyze_document(self, ocr_result: OCRDocumentResult) -> DocumentIntelligenceResult:
         """
-        Main entry point: Analyzes OCR document result and builds generic structured intelligence.
+        3-STEP PIPELINE:
+        STEP 1: PaddleOCR reads document & extracts raw text, geometry & regions.
+        STEP 2: Qwen LLM via Ollama understands semantic meaning (e.g. INV-1024 -> invoice_number).
+        STEP 3: OCR Engine validates Qwen data against OCR bounding boxes, normalizes format & stores in SQLite.
         """
         doc_id = str(uuid.uuid4())
-        filename = ocr_result.document.filename
         
         all_regions: List[Tuple[int, RegionResult]] = []
+        region_snippets: List[str] = []
         for page in ocr_result.pages:
             for r in page.regions:
                 all_regions.append((page.page_number, r))
+                region_snippets.append(r.text)
 
-        # 1. Infer Document Type dynamically
-        document_type, doc_type_conf = self._infer_document_type(ocr_result.aggregated_text, all_regions)
+        # STEP 1: PaddleOCR Data
+        raw_ocr_text = ocr_result.aggregated_text
 
-        # 2. Dynamic Key-Value & Entity Extraction
-        entities = self._extract_dynamic_entities(ocr_result.pages)
+        # STEP 2: Qwen LLM via Ollama Semantic Understanding
+        ollama_data = self.ollama_client.analyze_document_text(raw_ocr_text, region_snippets) if self.ollama_client else None
 
-        # 3. Table Structure Extraction
+        extraction_method = "qwen_ollama"
+        document_type = "unknown"
+        doc_type_conf = 0.85
+        raw_entities: List[Dict[str, Any]] = []
+
+        if ollama_data and isinstance(ollama_data, dict):
+            document_type = ollama_data.get("document_type", "unknown")
+            doc_type_conf = float(ollama_data.get("confidence_score", 0.90))
+            raw_entities = ollama_data.get("entities", [])
+            logger.info(f"Step 2: Qwen LLM extracted {len(raw_entities)} entities for '{document_type}' via Ollama.")
+        else:
+            extraction_method = "heuristic_fallback"
+            logger.info("Step 2: Ollama unreachable or unavailable; using OCR Engine heuristic understanding fallback.")
+            document_type, doc_type_conf = self._infer_document_type(raw_ocr_text, all_regions)
+            extracted_heuristic = self._extract_dynamic_entities(ocr_result.pages)
+            raw_entities = [{
+                "key": e.key,
+                "label": e.label,
+                "raw_value": e.raw_value,
+                "value_type": e.value_type
+            } for e in extracted_heuristic]
+
+        # STEP 3: OCR Engine Validation, Format Normalization & Provenance Linking
+        validated_entities: List[ExtractedEntity] = []
+        for item in raw_entities:
+            key = item.get("key", "").strip().lower().replace(" ", "_")
+            label = item.get("label", key.replace("_", " ").title())
+            raw_val = str(item.get("raw_value", "")).strip()
+
+            if not key or not raw_val:
+                continue
+
+            # Validate against PaddleOCR actual text & bounding boxes
+            matched_region = None
+            validation_status = "UNVERIFIED"
+            match_confidence = 0.80
+
+            raw_val_lower = raw_val.lower()
+            for pg_num, r in all_regions:
+                r_text_lower = r.text.lower()
+                if raw_val_lower in r_text_lower or r_text_lower in raw_val_lower:
+                    matched_region = (pg_num, r)
+                    validation_status = "VALIDATED" if raw_val_lower == r_text_lower else "OCR_MATCHED"
+                    match_confidence = r.confidence
+                    break
+
+            provenance = None
+            if matched_region:
+                pg_num, r = matched_region
+                provenance = SourceProvenance(
+                    page=pg_num,
+                    bbox=r.bbox,
+                    text=r.text
+                )
+
+            # Normalize values
+            val_type, norm_val, curr = self._normalize_value(raw_val)
+
+            entity = ExtractedEntity(
+                key=key,
+                label=label,
+                raw_value=raw_val,
+                normalized_value=norm_val if norm_val is not None else raw_val,
+                value_type=val_type,
+                confidence=round(match_confidence, 2),
+                source=provenance,
+                needs_review=(validation_status == "UNVERIFIED" or match_confidence < 0.70),
+                currency=curr,
+                validation_status=validation_status,
+                extraction_method=extraction_method
+            )
+            validated_entities.append(entity)
+
+        # Table & Layout Extraction
         tables = self._extract_tables(ocr_result.pages)
-
-        # 4. Extract High-Level Document Elements
         elements = self._extract_document_elements(ocr_result.pages)
+        relationships = self._build_relationships(validated_entities, document_type)
 
-        # 5. Entity Relationships
-        relationships = self._build_relationships(entities, document_type)
+        title_highlight, key_highlights = self._build_title_and_highlights(document_type, validated_entities)
 
-        # 6. Build Title & Highlights for Structured Store Cards
-        title_highlight, key_highlights = self._build_title_and_highlights(document_type, entities)
+        # Build Document-Centric Dynamic Table Dataset
+        dynamic_columns = []
+        header_record = {}
+        for e in validated_entities:
+            dynamic_columns.append({
+                "column_name": e.key,
+                "label": e.label,
+                "type": e.value_type
+            })
+            header_record[e.key] = e.normalized_value if e.normalized_value is not None else e.raw_value
 
-        # 7. Assemble Full Structured Information JSON (No raw binary/file storage)
+        table_rows = []
+        for t in tables:
+            headers = t.headers if t.headers else [f"col_{i+1}" for i in range(len(t.rows[0]) if t.rows else 0)]
+            for r in t.rows:
+                row_dict = dict(header_record)
+                for h, val in zip(headers, r):
+                    clean_h = str(h).strip().lower().replace(" ", "_")
+                    row_dict[clean_h] = val
+                    if not any(c["column_name"] == clean_h for c in dynamic_columns):
+                        dynamic_columns.append({"column_name": clean_h, "label": str(h), "type": "string"})
+                table_rows.append(row_dict)
+
+        dynamic_dataset = {
+            "dataset_id": f"dataset_{doc_id}",
+            "document_type": document_type,
+            "title": title_highlight,
+            "columns": dynamic_columns,
+            "header_record": header_record,
+            "table_rows": table_rows if table_rows else [header_record]
+        }
+
+        # Assemble Full Structured Information JSON
         structured_json = {
             "document_id": doc_id,
             "document_type": document_type,
             "title_highlight": title_highlight,
             "confidence_score": doc_type_conf,
+            "extraction_method": extraction_method,
             "key_highlights": key_highlights,
             "summary": {
                 "total_pages": ocr_result.document.page_count,
                 "total_regions": ocr_result.total_regions,
                 "average_confidence": ocr_result.average_confidence,
-                "entity_count": len(entities),
+                "entity_count": len(validated_entities),
                 "table_count": len(tables),
             },
             "fields": {e.key: {
@@ -87,17 +198,20 @@ class DocumentUnderstandingEngine:
                 "confidence": e.confidence,
                 "currency": e.currency,
                 "needs_review": e.needs_review,
+                "validation_status": e.validation_status,
+                "extraction_method": e.extraction_method,
                 "provenance": e.source.dict() if e.source else None
-            } for e in entities},
+            } for e in validated_entities},
             "tables": [t.dict() for t in tables],
             "relationships": [r.dict() for r in relationships],
+            "dynamic_dataset": dynamic_dataset
         }
 
         return DocumentIntelligenceResult(
             document_id=doc_id,
             document_type=document_type,
             confidence_score=doc_type_conf,
-            entities=entities,
+            entities=validated_entities,
             tables=tables,
             relationships=relationships,
             elements=elements,

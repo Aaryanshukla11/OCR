@@ -64,6 +64,20 @@ class DatabaseService:
             );
         """)
 
+        # 3. Document-Centric Dynamic Datasets Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS document_datasets (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                dataset_name TEXT NOT NULL,
+                schema_json TEXT NOT NULL,
+                header_row_json TEXT NOT NULL,
+                table_rows_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (document_id) REFERENCES structured_documents (id) ON DELETE CASCADE
+            );
+        """)
+
         # Indexes for fast SQL search & filtering
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_struct_doc_type ON structured_documents (document_type);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_struct_created ON structured_documents (created_at);")
@@ -71,6 +85,7 @@ class DatabaseService:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_key ON extracted_entities (key);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_norm ON extracted_entities (normalized_value);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_type ON extracted_entities (value_type);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_dataset_doc ON document_datasets (document_id);")
 
         conn.commit()
         conn.close()
@@ -134,6 +149,23 @@ class DatabaseService:
                 source_pg,
                 source_bbox_str,
                 1 if entity.needs_review else 0
+            ))
+
+        # 3. Insert Document-Centric Dynamic Dataset Table Representation
+        dyn_dataset = intel_result.structured_json.get("dynamic_dataset", {})
+        if dyn_dataset:
+            cursor.execute("""
+                INSERT OR REPLACE INTO document_datasets (
+                    id, document_id, dataset_name, schema_json, header_row_json, table_rows_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                dyn_dataset.get("dataset_id", f"dataset_{intel_result.document_id}"),
+                intel_result.document_id,
+                dyn_dataset.get("title", f"{intel_result.document_type.upper()}_Dataset"),
+                json.dumps(dyn_dataset.get("columns", [])),
+                json.dumps(dyn_dataset.get("header_record", {})),
+                json.dumps(dyn_dataset.get("table_rows", [])),
+                created_at
             ))
 
         conn.commit()
@@ -254,3 +286,26 @@ class DatabaseService:
         conn.commit()
         conn.close()
         return deleted
+
+    @classmethod
+    def get_document_dataset(cls, doc_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches stored Document-Centric Dynamic Table Dataset representation by document ID."""
+        cls.init_db()
+        conn = cls.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM document_datasets WHERE document_id = ?", (doc_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return None
+
+        return {
+            "dataset_id": row["id"],
+            "document_id": row["document_id"],
+            "dataset_name": row["dataset_name"],
+            "columns": json.loads(row["schema_json"]),
+            "header_record": json.loads(row["header_row_json"]),
+            "table_rows": json.loads(row["table_rows_json"]),
+            "created_at": row["created_at"]
+        }

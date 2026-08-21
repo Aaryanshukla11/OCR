@@ -109,13 +109,15 @@ class DocumentQueryEngine:
         conn = DatabaseService.get_connection()
         cursor = conn.cursor()
 
-        # Build SQL query dynamically and safely using parameters
+        # Build SQL query dynamically and safely using parameters over document-centric dynamic datasets
         sql = """
             SELECT 
                 d.id as doc_id, d.document_type, d.structured_data, d.confidence as doc_conf, d.created_at,
-                e.key, e.label, e.raw_value, e.normalized_value, e.value_type, e.confidence, e.source_page, e.source_bbox_json
+                e.key, e.label, e.raw_value, e.normalized_value, e.value_type, e.confidence, e.source_page, e.source_bbox_json,
+                ds.dataset_name, ds.schema_json, ds.header_row_json, ds.table_rows_json
             FROM structured_documents d
             LEFT JOIN extracted_entities e ON d.id = e.document_id
+            LEFT JOIN document_datasets ds ON d.id = ds.document_id
         """
 
         where_conditions = []
@@ -132,9 +134,9 @@ class DocumentQueryEngine:
         if plan.search_terms:
             term_clauses = []
             for term in plan.search_terms:
-                term_clauses.append("(LOWER(d.structured_data) LIKE ? OR LOWER(e.raw_value) LIKE ?)")
+                term_clauses.append("(LOWER(d.structured_data) LIKE ? OR LOWER(e.raw_value) LIKE ? OR LOWER(ds.header_row_json) LIKE ? OR LOWER(ds.table_rows_json) LIKE ?)")
                 p = f"%{term.lower()}%"
-                params.extend([p, p])
+                params.extend([p, p, p, p])
             where_conditions.append("(" + " OR ".join(term_clauses) + ")")
 
         if where_conditions:

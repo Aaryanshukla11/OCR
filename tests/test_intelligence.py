@@ -137,6 +137,14 @@ def test_sqlite_structured_storage():
     assert detail["document_type"] == "invoice"
     assert len(detail["entities"]) > 0
 
+    # Retrieve Document-Centric Dynamic Table Dataset
+    dataset = DatabaseService.get_document_dataset(doc_id)
+    assert dataset is not None
+    assert "columns" in dataset
+    assert "header_record" in dataset
+    assert "table_rows" in dataset
+    assert len(dataset["columns"]) > 0
+
 def test_query_engine():
     engine = DocumentUnderstandingEngine()
     mock_ocr = create_mock_ocr_result(filename="august_bill.png")

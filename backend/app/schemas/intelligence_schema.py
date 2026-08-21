@@ -16,6 +16,8 @@ class ExtractedEntity(BaseModel):
     source: Optional[SourceProvenance] = None
     needs_review: bool = False
     currency: Optional[str] = None
+    validation_status: str = "VALIDATED"  # VALIDATED | OCR_MATCHED | UNVERIFIED
+    extraction_method: str = "qwen_ollama"  # qwen_ollama | heuristic_fallback
 
 class ExtractedTable(BaseModel):
     table_id: int

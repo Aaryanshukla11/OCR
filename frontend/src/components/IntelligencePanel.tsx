@@ -30,18 +30,37 @@ export const IntelligencePanel: React.FC<IntelligencePanelProps> = ({
   return (
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-xs flex flex-col h-full">
       {/* Document Classification Header */}
-      <div className="pb-3 mb-3 border-b border-zinc-800 flex items-center justify-between">
-        <div>
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono block">Inferred Document Type</span>
-          <span className="text-xs font-bold font-mono text-zinc-100 uppercase tracking-tight flex items-center space-x-1.5 mt-0.5">
-            <Cpu className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{docType.replace('_', ' ')}</span>
+      <div className="pb-3 mb-3 border-b border-zinc-800 space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono block">Inferred Document Type</span>
+            <span className="text-xs font-bold font-mono text-zinc-100 uppercase tracking-tight flex items-center space-x-1.5 mt-0.5">
+              <Cpu className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{docType.replace('_', ' ')}</span>
+            </span>
+          </div>
+
+          <span className="text-[10px] px-2 py-0.5 rounded font-mono border border-zinc-800 bg-zinc-950 text-zinc-300">
+            Conf: {Math.round((intel.confidence_score || 0.8) * 100)}%
           </span>
         </div>
 
-        <span className="text-[10px] px-2 py-0.5 rounded font-mono border border-zinc-800 bg-zinc-950 text-zinc-300">
-          Conf: {Math.round((intel.confidence_score || 0.8) * 100)}%
-        </span>
+        {/* 3-Step Pipeline Status Badges */}
+        <div className="flex flex-wrap items-center gap-1 font-mono text-[9px]">
+          <span className="px-1.5 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-zinc-400">
+            1. PaddleOCR Text
+          </span>
+          <span className={`px-1.5 py-0.5 rounded border ${
+            intel.structured_json?.extraction_method === 'qwen_ollama'
+              ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-100'
+              : 'bg-zinc-950 text-zinc-400 border-zinc-800'
+          }`}>
+            2. {intel.structured_json?.extraction_method === 'qwen_ollama' ? 'Qwen LLM (Ollama)' : 'Heuristic Engine'}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-emerald-400 font-medium">
+            3. OCR Engine Validated
+          </span>
+        </div>
       </div>
 
       {/* Sub-Tab Navigation */}
@@ -104,6 +123,16 @@ export const IntelligencePanel: React.FC<IntelligencePanelProps> = ({
                     </span>
                     
                     <div className="flex items-center space-x-1 font-mono text-[10px]">
+                      {e.validation_status && (
+                        <span className={`px-1.5 py-0.2 rounded border ${
+                          e.validation_status === 'VALIDATED'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                        }`}>
+                          {e.validation_status}
+                        </span>
+                      )}
+
                       {e.needs_review ? (
                         <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center">
                           <AlertTriangle className="w-2.5 h-2.5 mr-0.5" /> Review

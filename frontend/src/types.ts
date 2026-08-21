@@ -38,6 +38,8 @@ export interface ExtractedEntity {
   source?: SourceProvenance;
   needs_review: boolean;
   currency?: string | null;
+  validation_status?: string;
+  extraction_method?: string;
 }
 
 export interface ExtractedTable {
@@ -47,6 +49,21 @@ export interface ExtractedTable {
   rows: any[][];
   bbox: number[];
   confidence: number;
+}
+
+export interface DynamicColumn {
+  column_name: string;
+  label: string;
+  type: string;
+}
+
+export interface DynamicDataset {
+  dataset_id: string;
+  document_type: string;
+  title: string;
+  columns: DynamicColumn[];
+  header_record: Record<string, any>;
+  table_rows: Record<string, any>[];
 }
 
 export interface DocumentIntelligenceResult {
