@@ -21,4 +21,4 @@ postprocessing:
 
 validation:
   max_file_size_mb: 25
-  allowed_extensions: [".png", ".jpg", ".jpeg", ".webp", ".pdf"]
+  allowed_extensions: [".png", ".jpg", ".jpeg", ".webp", ".pdf", ".doc", ".docx"]

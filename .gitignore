@@ -60,3 +60,5 @@ backend/data/history.json
 *~
 .DS_Store
 Thumbs.db
+.pyrefly*
+__pyrefly*

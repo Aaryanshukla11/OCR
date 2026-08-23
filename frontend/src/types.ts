@@ -9,7 +9,8 @@ export interface BoundingBoxRegion {
 export interface PageOCRResult {
   page_number: number;
   regions: BoundingBoxRegion[];
-  extracted_text: string;
+  full_text: string;
+  extracted_text?: string;
   average_confidence: number;
   page_image?: string;
 }
@@ -35,6 +36,13 @@ export interface ExtractedEntity {
   normalized_value?: string | number | boolean | null;
   value_type: string;
   confidence: number;
+  identified_as?: string;
+  qwen_prediction?: string;
+  final_prediction?: string;
+  semantic_source?: string;
+  semantic_confidence?: number;
+  evidence?: string[];
+  evidence_details?: Record<string, any>;
   source?: SourceProvenance;
   needs_review: boolean;
   currency?: string | null;
@@ -76,6 +84,77 @@ export interface DocumentIntelligenceResult {
   structured_json: Record<string, any>;
 }
 
+export interface LayoutRegion {
+  id: string;
+  type: string; // 'header' | 'body' | 'footer' | 'table'
+  bbox: number[];
+  reading_order: number;
+  element_ids?: string[];
+}
+
+export interface TextGroup {
+  id: string;
+  element_ids: string[];
+  text: string;
+  bbox: number[];
+  confidence: number;
+  line_count: number;
+  region_id?: string;
+}
+
+export interface KeyValueLink {
+  key_text: string;
+  value_text: string;
+  key_region: string;
+  value_region: string;
+  relationship: string;
+  confidence: number;
+  value_category: string;
+  key_bbox: number[];
+  value_bbox: number[];
+  spatial_relation: string;
+}
+
+export interface IntermediatePage {
+  page: number;
+  width: number;
+  height: number;
+  regions: LayoutRegion[];
+  elements: any[];
+  groups: TextGroup[];
+  relationships: KeyValueLink[];
+  reading_order: string[];
+}
+
+export interface RelationshipGraphNode {
+  id: string;
+  label: string;
+  type: string;
+  bbox: number[];
+}
+
+export interface RelationshipGraphEdge {
+  source: string;
+  target: string;
+  type: string;
+  confidence: number;
+}
+
+export interface RelationshipGraph {
+  nodes: RelationshipGraphNode[];
+  edges: RelationshipGraphEdge[];
+}
+
+export interface IntermediateDocument {
+  filename: string;
+  total_pages: number;
+  pages: IntermediatePage[];
+  ocr_confidence: number;
+  grouping_confidence: number;
+  relationship_confidence: number;
+  graph: RelationshipGraph;
+}
+
 export interface OCRResponse {
   filename: string;
   file_type: string;
@@ -88,6 +167,7 @@ export interface OCRResponse {
   aggregated_text: string;
   accuracy: AccuracyMetrics;
   status: string;
+  intermediate_representation?: IntermediateDocument;
   intelligence?: DocumentIntelligenceResult;
 }
 

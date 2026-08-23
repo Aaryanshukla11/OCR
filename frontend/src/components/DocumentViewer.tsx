@@ -17,6 +17,12 @@ interface DocumentViewerProps {
   onNavigatePrevMatch?: () => void;
   totalMatchesCount?: number;
   currentMatchIndex?: number;
+  intermediateDoc?: any;
+  showOcrBoxes?: boolean;
+  showGroupedLines?: boolean;
+  showKeyValueLinks?: boolean;
+  showLayoutRegions?: boolean;
+  showReadingOrder?: boolean;
 }
 
 export const DocumentViewer: React.FC<DocumentViewerProps> = ({
@@ -34,6 +40,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   onNavigatePrevMatch,
   totalMatchesCount = 0,
   currentMatchIndex = 0,
+  intermediateDoc,
+  showOcrBoxes = true,
+  showGroupedLines = false,
+  showKeyValueLinks = false,
+  showLayoutRegions = false,
+  showReadingOrder = false,
 }) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -50,6 +62,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const regions = currentPage?.regions || [];
   const currentImageSrc = currentPage?.page_image || imageSrc;
   const isRawPdfBlob = !currentPage?.page_image && (imageSrc.includes('.pdf') || (imageSrc.startsWith('blob:') && !currentPage));
+
+  const interPage = intermediateDoc?.pages?.[activePageIndex] || intermediateDoc?.pages?.[0];
+  const kvLinks = interPage?.relationships || [];
+  const textGroups = interPage?.groups || [];
+  const layoutRegions = interPage?.regions || [];
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 4));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5));
@@ -97,7 +114,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   };
 
   const hasSearch = searchQuery.trim().length > 0;
-
 
   return (
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl overflow-hidden shadow-xs flex flex-col h-full">
@@ -290,14 +306,68 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             />
           )}
 
-
-          {showBoxes && imageDimensions.naturalWidth > 0 && (
+          {/* SVG Overlay Layer */}
+          {imageDimensions.naturalWidth > 0 && (
             <svg
               className="absolute top-0 left-0 w-full h-full pointer-events-auto"
               viewBox={`0 0 ${imageDimensions.naturalWidth} ${imageDimensions.naturalHeight}`}
               preserveAspectRatio="none"
             >
-              {regions.map((region) => {
+              {/* Layer 1: Layout Region Boundaries (Header/Body/Footer/Table) */}
+              {showLayoutRegions && layoutRegions.map((reg: any, idx: number) => {
+                const colors: Record<string, string> = {
+                  header: '#a855f7',
+                  body: '#3b82f6',
+                  footer: '#6b7280',
+                  table: '#ef4444',
+                };
+                const col = colors[reg.type] || '#10b981';
+                const b = reg.bbox || [0,0,0,0];
+                return (
+                  <g key={`lreg_${idx}`}>
+                    <rect
+                      x={b[0]}
+                      y={b[1]}
+                      width={Math.max(10, b[2] - b[0])}
+                      height={Math.max(10, b[3] - b[1])}
+                      fill={`${col}10`}
+                      stroke={col}
+                      strokeWidth="2"
+                      strokeDasharray="4 2"
+                    />
+                    <text
+                      x={b[0] + 6}
+                      y={b[1] + 16}
+                      fill={col}
+                      fontSize="14"
+                      fontWeight="bold"
+                      className="font-mono select-none uppercase"
+                    >
+                      [{reg.type}] #{reg.reading_order}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Layer 2: Grouped Line Boundaries */}
+              {showGroupedLines && textGroups.map((g: any, idx: number) => {
+                const b = g.bbox || [0,0,0,0];
+                return (
+                  <rect
+                    key={`group_${idx}`}
+                    x={b[0]}
+                    y={b[1]}
+                    width={Math.max(5, b[2] - b[0])}
+                    height={Math.max(5, b[3] - b[1])}
+                    fill="#a855f720"
+                    stroke="#c084fc"
+                    strokeWidth="1.5"
+                  />
+                );
+              })}
+
+              {/* Layer 3: Raw OCR Bounding Boxes */}
+              {showBoxes && showOcrBoxes && regions.map((region) => {
                 const isSelected = selectedRegionId === region.id;
                 const isSearchMatch = matchingRegionIds.has(region.id);
                 const isActiveMatch = activeMatchRegionId === region.id;
@@ -306,7 +376,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   ? region.polygon.map((pt) => `${pt[0]},${pt[1]}`).join(' ')
                   : `${region.bbox[0]},${region.bbox[1]} ${region.bbox[2]},${region.bbox[1]} ${region.bbox[2]},${region.bbox[3]} ${region.bbox[0]},${region.bbox[3]}`;
 
-                // Color calculation
                 let color = isSelected
                   ? '#ffffff'
                   : region.confidence >= 0.95
@@ -321,7 +390,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
                 if (hasSearch) {
                   if (isActiveMatch) {
-                    color = '#f59e0b'; // Crisp amber for active search match
+                    color = '#f59e0b';
                     strokeWidth = 3.5;
                     fillOpacity = '50';
                   } else if (isSearchMatch) {
@@ -329,7 +398,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     strokeWidth = 2.5;
                     fillOpacity = '30';
                   } else {
-                    opacity = '0.25'; // Dim non-matching regions
+                    opacity = '0.25';
                   }
                 }
 
@@ -365,6 +434,77 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   </g>
                 );
               })}
+
+              {/* Layer 4: Key-Value Connecting SVG Vectors & Bounding Box Highlights */}
+              {showKeyValueLinks && kvLinks.map((link: any, idx: number) => {
+                const kb = link.key_bbox || [0,0,0,0];
+                const vb = link.value_bbox || [0,0,0,0];
+
+                const k_cx = (kb[0] + kb[2]) / 2.0;
+                const k_cy = (kb[1] + kb[3]) / 2.0;
+                const v_cx = (vb[0] + vb[2]) / 2.0;
+                const v_cy = (vb[1] + vb[3]) / 2.0;
+
+                return (
+                  <g key={`kv_vector_${idx}`}>
+                    {/* Key Box (Amber/Orange) */}
+                    <rect
+                      x={kb[0]}
+                      y={kb[1]}
+                      width={Math.max(5, kb[2] - kb[0])}
+                      height={Math.max(5, kb[3] - kb[1])}
+                      fill="#f59e0b30"
+                      stroke="#f59e0b"
+                      strokeWidth="2"
+                    />
+                    {/* Value Box (Green) */}
+                    <rect
+                      x={vb[0]}
+                      y={vb[1]}
+                      width={Math.max(5, vb[2] - vb[0])}
+                      height={Math.max(5, vb[3] - vb[1])}
+                      fill="#10b98130"
+                      stroke="#10b981"
+                      strokeWidth="2"
+                    />
+                    {/* Vector Link Line */}
+                    <line
+                      x1={k_cx}
+                      y1={k_cy}
+                      x2={v_cx}
+                      y2={v_cy}
+                      stroke="#f59e0b"
+                      strokeWidth="2.5"
+                      strokeDasharray="4 3"
+                    />
+                    <circle cx={k_cx} cy={k_cy} r="4" fill="#f59e0b" />
+                    <circle cx={v_cx} cy={v_cy} r="4" fill="#10b981" />
+                  </g>
+                );
+              })}
+
+              {/* Layer 5: Reading Order Badges */}
+              {showReadingOrder && regions.map((r, idx) => (
+                <g key={`ro_${idx}`}>
+                  <circle
+                    cx={r.bbox[0] + 12}
+                    cy={r.bbox[1] + 12}
+                    r="10"
+                    fill="#3b82f6"
+                  />
+                  <text
+                    x={r.bbox[0] + 12}
+                    y={r.bbox[1] + 16}
+                    fill="#ffffff"
+                    fontSize="11"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                    className="font-mono select-none"
+                  >
+                    {idx + 1}
+                  </text>
+                </g>
+              ))}
             </svg>
           )}
         </div>

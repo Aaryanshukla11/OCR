@@ -87,6 +87,14 @@ class DatabaseService:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_entity_type ON extracted_entities (value_type);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_dataset_doc ON document_datasets (document_id);")
 
+        # Schema Migration Check for Existing Database Files
+        cursor.execute("PRAGMA table_info(extracted_entities);")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        if "source_page" not in existing_cols:
+            cursor.execute("ALTER TABLE extracted_entities ADD COLUMN source_page INTEGER DEFAULT 1;")
+        if "source_bbox_json" not in existing_cols:
+            cursor.execute("ALTER TABLE extracted_entities ADD COLUMN source_bbox_json TEXT;")
+
         conn.commit()
         conn.close()
         logger.info(f"SQLite Structured Knowledge Database initialized at: {cls.DB_PATH}")

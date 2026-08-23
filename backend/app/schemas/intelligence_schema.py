@@ -13,6 +13,13 @@ class ExtractedEntity(BaseModel):
     normalized_value: Optional[Union[str, float, int, bool]] = None
     value_type: str = "string"  # string | number | currency | date | datetime | percentage | identifier | person | organization | location | email | phone | address | boolean | unknown
     confidence: float = 1.0
+    identified_as: Optional[str] = None
+    qwen_prediction: Optional[str] = None
+    final_prediction: Optional[str] = None
+    semantic_source: Optional[str] = "ollama"
+    semantic_confidence: Optional[float] = None
+    evidence: List[str] = Field(default_factory=list)
+    evidence_details: Dict[str, Any] = Field(default_factory=dict)
     source: Optional[SourceProvenance] = None
     needs_review: bool = False
     currency: Optional[str] = None

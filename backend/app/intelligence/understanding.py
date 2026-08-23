@@ -121,13 +121,50 @@ class DocumentUnderstandingEngine:
             # Normalize values
             val_type, norm_val, curr = self._normalize_value(raw_val)
 
+            # Check if intermediate_representation contains semantic_results for this field
+            safe_label = str(label or key.replace("_", " ").title())
+            label_lower = safe_label.lower()
+
+            ident_as = None
+            qwen_pred = None
+            final_pred = None
+            sem_src = "ollama"
+            sem_conf = None
+            evidence_lst = []
+            evid_details = {}
+
+            inter_rep = getattr(ocr_result, "intermediate_representation", None)
+            if inter_rep and isinstance(inter_rep, dict):
+                sem_res = inter_rep.get("semantic_results")
+                if sem_res and isinstance(sem_res, dict):
+                    fields_list = sem_res.get("fields", [])
+                    for sf in fields_list:
+                        sf_src = str(sf.get("source_field") or "").strip().lower()
+                        sf_val = str(sf.get("value") or "").strip().lower()
+                        if (sf_src == label_lower or sf_src == key or sf_val == raw_val_lower):
+                            ident_as = sf.get("identified_as")
+                            qwen_pred = sf.get("qwen_prediction")
+                            final_pred = sf.get("final_prediction") or ident_as
+                            sem_src = sf.get("semantic_source", "ollama")
+                            sem_conf = sf.get("semantic_confidence")
+                            evidence_lst = sf.get("evidence", [])
+                            evid_details = sf.get("evidence_details", {})
+                            break
+
             entity = ExtractedEntity(
                 key=key,
-                label=label,
+                label=safe_label,
                 raw_value=raw_val,
                 normalized_value=norm_val if norm_val is not None else raw_val,
                 value_type=val_type,
                 confidence=round(match_confidence, 2),
+                identified_as=ident_as,
+                qwen_prediction=qwen_pred,
+                final_prediction=final_pred,
+                semantic_source=sem_src,
+                semantic_confidence=sem_conf,
+                evidence=evidence_lst,
+                evidence_details=evid_details,
                 source=provenance,
                 needs_review=(validation_status == "UNVERIFIED" or match_confidence < 0.70),
                 currency=curr,
@@ -160,10 +197,11 @@ class DocumentUnderstandingEngine:
             for r in t.rows:
                 row_dict = dict(header_record)
                 for h, val in zip(headers, r):
-                    clean_h = str(h).strip().lower().replace(" ", "_")
+                    h_str = h if h is not None else ""
+                    clean_h = h_str.strip().lower().replace(" ", "_")
                     row_dict[clean_h] = val
                     if not any(c["column_name"] == clean_h for c in dynamic_columns):
-                        dynamic_columns.append({"column_name": clean_h, "label": str(h), "type": "string"})
+                        dynamic_columns.append({"column_name": clean_h, "label": h_str, "type": "string"})
                 table_rows.append(row_dict)
 
         dynamic_dataset = {
@@ -200,10 +238,10 @@ class DocumentUnderstandingEngine:
                 "needs_review": e.needs_review,
                 "validation_status": e.validation_status,
                 "extraction_method": e.extraction_method,
-                "provenance": e.source.dict() if e.source else None
+                "provenance": e.source.model_dump() if e.source else None
             } for e in validated_entities},
-            "tables": [t.dict() for t in tables],
-            "relationships": [r.dict() for r in relationships],
+            "tables": [t.model_dump() for t in tables],
+            "relationships": [r.model_dump() for r in relationships],
             "dynamic_dataset": dynamic_dataset
         }
 
@@ -298,7 +336,7 @@ class DocumentUnderstandingEngine:
                 if kw in text_lower:
                     scores[category] += 1
 
-        best_category = max(scores, key=scores.get)
+        best_category = max(scores.keys(), key=lambda k: scores[k])
         best_score = scores[best_category]
 
         if best_score >= 2:

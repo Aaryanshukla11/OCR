@@ -1,0 +1,13 @@
+{
+  "venvPath": ".",
+  "venv": "venv",
+  "extraPaths": [
+    "./backend"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.pyrefly/**",
+    "C:/__pyrefly_virtual__/**"
+  ]
+}

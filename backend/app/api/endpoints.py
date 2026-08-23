@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+from typing import Optional
 import numpy as np
 from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -64,7 +65,7 @@ async def run_ocr(
             response_data["file_type"] = doc.get("file_type", "UNKNOWN")
             response_data["total_pages"] = doc.get("page_count", 1)
         else:
-            response_data = doc_result.dict()
+            response_data = doc_result.model_dump()
             add_history_entry(
                 filename=filename,
                 processing_time=doc_result.processing.processing_time_sec,
@@ -162,11 +163,11 @@ class QueryApiRequest(BaseModel):
     query: str
 
 @router.get("/documents")
-def list_stored_documents(document_type: str = None, search: str = None):
+def list_stored_documents(document_type: Optional[str] = None, search: Optional[str] = None):
     """Returns stored documents list from SQLite database."""
     from app.services.database import DatabaseService
     docs = DatabaseService.get_documents(document_type=document_type, search_query=search)
-    return {"documents": [d.dict() for d in docs]}
+    return {"documents": [d.model_dump() for d in docs]}
 
 @router.get("/documents/{doc_id}")
 def get_stored_document_detail(doc_id: str):
@@ -194,5 +195,5 @@ def execute_natural_language_query(payload: QueryApiRequest):
         raise HTTPException(status_code=400, detail="Query text cannot be empty")
         
     response = DocumentQueryEngine.execute_query(payload.query)
-    return response.dict()
+    return response.model_dump()
 

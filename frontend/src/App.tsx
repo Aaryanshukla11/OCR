@@ -13,8 +13,9 @@ import { HistoryView } from './components/HistoryView';
 import { IntelligencePanel } from './components/IntelligencePanel';
 import { StructuredDataStore } from './components/StructuredDataStore';
 import { QueryInterface } from './components/QueryInterface';
+import { DebugViewPanel } from './components/DebugViewPanel';
 import type { OCRResponse } from './types';
-import { LayoutGrid, Columns, AlertCircle, FileCheck, TestTube, Target, FileSearch, FileText, Cpu } from 'lucide-react';
+import { LayoutGrid, Columns, AlertCircle, FileCheck, TestTube, Target, FileSearch, FileText, Cpu, Eye } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTabType>('tester');
@@ -32,8 +33,15 @@ export default function App() {
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
 
-  // Right sidebar tab state: 'intelligence' | 'regions' | 'find' | 'text'
-  const [rightPanelTab, setRightPanelTab] = useState<'intelligence' | 'regions' | 'find' | 'text'>('intelligence');
+  // Right sidebar tab state: 'intelligence' | 'regions' | 'debug' | 'find' | 'text'
+  const [rightPanelTab, setRightPanelTab] = useState<'intelligence' | 'regions' | 'debug' | 'find' | 'text'>('intelligence');
+
+  // Debug overlay toggles
+  const [showOcrBoxes, setShowOcrBoxes] = useState(true);
+  const [showGroupedLines, setShowGroupedLines] = useState(true);
+  const [showKeyValueLinks, setShowKeyValueLinks] = useState(true);
+  const [showLayoutRegions, setShowLayoutRegions] = useState(true);
+  const [showReadingOrder, setShowReadingOrder] = useState(true);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -138,8 +146,15 @@ export default function App() {
 
       const resultData: OCRResponse = await response.json();
       setOcrData(resultData);
+
+      // Auto-select best right panel tab: show 'intelligence' if entities exist, otherwise show 'text' (Full Text)
+      const hasEntities = (resultData.intelligence?.entities?.length || 0) > 0;
+      setRightPanelTab(hasEntities ? 'intelligence' : 'text');
     } catch (err: any) {
-      setErrorMessage(err.message || 'An unexpected error occurred during OCR processing.');
+      const msg = err.message === 'Failed to fetch'
+        ? 'Could not connect to OCR backend server at http://localhost:8000. Please verify the backend service is running.'
+        : (err.message || 'An unexpected error occurred during OCR processing.');
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
@@ -371,16 +386,22 @@ export default function App() {
                         onNavigatePrevMatch={handleNavigatePrevMatch}
                         totalMatchesCount={matchingRegions.length}
                         currentMatchIndex={activeMatchIndex}
+                        intermediateDoc={ocrData.intermediate_representation}
+                        showOcrBoxes={showOcrBoxes}
+                        showGroupedLines={showGroupedLines}
+                        showKeyValueLinks={showKeyValueLinks}
+                        showLayoutRegions={showLayoutRegions}
+                        showReadingOrder={showReadingOrder}
                       />
                     </div>
 
                     {/* Right Column: Tabbed Workspace Sidebar */}
                     <div className="flex flex-col space-y-4 min-h-[550px]">
                       {/* Sidebar Tab Header */}
-                      <div className="flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800">
+                      <div className="flex items-center space-x-1 bg-zinc-900/60 p-1 rounded-lg border border-zinc-800 overflow-x-auto">
                         <button
                           onClick={() => setRightPanelTab('intelligence')}
-                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'intelligence'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -391,8 +412,20 @@ export default function App() {
                         </button>
 
                         <button
+                          onClick={() => setRightPanelTab('debug')}
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
+                            rightPanelTab === 'debug'
+                              ? 'bg-amber-400 text-zinc-950 font-semibold shadow-xs'
+                              : 'text-zinc-400 hover:text-zinc-200'
+                          }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Debug View</span>
+                        </button>
+
+                        <button
                           onClick={() => setRightPanelTab('regions')}
-                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'regions'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -404,7 +437,7 @@ export default function App() {
 
                         <button
                           onClick={() => setRightPanelTab('find')}
-                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'find'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -421,7 +454,7 @@ export default function App() {
 
                         <button
                           onClick={() => setRightPanelTab('text')}
-                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-md text-xs font-medium transition-colors ${
                             rightPanelTab === 'text'
                               ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-xs'
                               : 'text-zinc-400 hover:text-zinc-200'
@@ -439,6 +472,23 @@ export default function App() {
                             data={ocrData}
                             selectedRegionId={selectedRegionId}
                             setSelectedRegionId={setSelectedRegionId}
+                          />
+                        )}
+
+                        {rightPanelTab === 'debug' && (
+                          <DebugViewPanel
+                            data={ocrData}
+                            activePageIndex={activePageIndex}
+                            showOcrBoxes={showOcrBoxes}
+                            setShowOcrBoxes={setShowOcrBoxes}
+                            showGroupedLines={showGroupedLines}
+                            setShowGroupedLines={setShowGroupedLines}
+                            showKeyValueLinks={showKeyValueLinks}
+                            setShowKeyValueLinks={setShowKeyValueLinks}
+                            showLayoutRegions={showLayoutRegions}
+                            setShowLayoutRegions={setShowLayoutRegions}
+                            showReadingOrder={showReadingOrder}
+                            setShowReadingOrder={setShowReadingOrder}
                           />
                         )}
 

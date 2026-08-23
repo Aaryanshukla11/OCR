@@ -33,7 +33,7 @@ class PostprocessingConfig:
 @dataclass
 class ValidationConfig:
     max_file_size_mb: int = 25
-    allowed_extensions: List[str] = field(default_factory=lambda: [".png", ".jpg", ".jpeg", ".webp", ".pdf"])
+    allowed_extensions: List[str] = field(default_factory=lambda: [".png", ".jpg", ".jpeg", ".webp", ".pdf", ".doc", ".docx"])
 
 @dataclass
 class AppConfig:

@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 def levenshtein_distance(seq1, seq2):
     m, n = len(seq1), len(seq2)
@@ -15,7 +16,7 @@ def levenshtein_distance(seq1, seq2):
                 dp[i][j] = 1 + min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
     return dp[m][n]
 
-def compute_accuracy_metrics(extracted_text: str, ground_truth: str = None) -> dict:
+def compute_accuracy_metrics(extracted_text: str, ground_truth: Optional[str] = None) -> dict:
     if not ground_truth or not ground_truth.strip():
         return {
             "available": False,

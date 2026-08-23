@@ -12,6 +12,8 @@ os.environ['PADDLE_DISABLE_ONEDNN'] = '1'
 os.environ['FLAGS_enable_pir_api'] = '0'
 os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
 
+import cv2
+
 class PaddleOCRProvider(BaseOCRProvider):
     _instance = None
     
@@ -55,53 +57,94 @@ class PaddleOCRProvider(BaseOCRProvider):
         if not raw_output:
             return regions
             
-        # Format A: Paddlex 3.x dict format (list of dicts)
-        if isinstance(raw_output, list) and len(raw_output) > 0 and isinstance(raw_output[0], dict):
-            page_data = raw_output[0]
-            texts = page_data.get('rec_texts', [])
-            scores = page_data.get('rec_scores', [])
-            polys = page_data.get('rec_polys') if page_data.get('rec_polys') is not None else page_data.get('dt_polys', [])
-            boxes = page_data.get('rec_boxes', [])
-            
-            for idx, text in enumerate(texts):
-                score = float(scores[idx]) if idx < len(scores) else 0.0
+        page_items = raw_output if isinstance(raw_output, list) else [raw_output]
+        region_id_counter = 1
+        
+        for page_data in page_items:
+            if not page_data:
+                continue
                 
-                poly_coords = []
-                if polys is not None and idx < len(polys):
-                    p = polys[idx]
-                    if hasattr(p, 'tolist'):
-                        poly_coords = p.tolist()
-                    elif isinstance(p, (list, tuple)):
-                        poly_coords = [list(pt) for pt in p]
+            # If page_data has an inner 'res' key/attribute (PaddleX 3.x result container format)
+            target_data = page_data
+            if hasattr(page_data, 'res') and getattr(page_data, 'res'):
+                target_data = getattr(page_data, 'res')
+            elif isinstance(page_data, dict) and 'res' in page_data and isinstance(page_data['res'], (dict, list)):
+                target_data = page_data['res']
+
+            # Format A: Paddlex 3.x / PaddleOCR 3.7+ dictionary or object format
+            if isinstance(target_data, dict) or hasattr(target_data, 'get'):
+                texts = target_data.get('rec_texts')
+                if texts is None:
+                    texts = target_data.get('texts')
+                if texts is None:
+                    texts = target_data.get('text')
+                if texts is None:
+                    texts = []
+
+                scores = target_data.get('rec_scores')
+                if scores is None:
+                    scores = target_data.get('scores')
+                if scores is None:
+                    scores = []
+
+                polys = target_data.get('rec_polys')
+                if polys is None:
+                    polys = target_data.get('dt_polys')
+                if polys is None:
+                    polys = target_data.get('polys')
+
+                boxes = target_data.get('rec_boxes')
+                if boxes is None:
+                    boxes = target_data.get('boxes')
+                
+                if isinstance(texts, str):
+                    texts = [texts]
+                    
+                for idx, text in enumerate(texts):
+                    score = float(scores[idx]) if (scores and idx < len(scores)) else 1.0
+                    
+                    poly_coords = []
+                    if polys is not None and idx < len(polys):
+                        p = polys[idx]
+                        if hasattr(p, 'tolist'):
+                            poly_coords = p.tolist()
+                        elif isinstance(p, (list, tuple)):
+                            poly_coords = [list(pt) for pt in p]
+                            
+                    if not poly_coords and boxes is not None and idx < len(boxes):
+                        b = boxes[idx]
+                        if hasattr(b, 'tolist'):
+                            b = b.tolist()
+                        if len(b) >= 4:
+                            poly_coords = [
+                                [float(b[0]), float(b[1])],
+                                [float(b[2]), float(b[1])],
+                                [float(b[2]), float(b[3])],
+                                [float(b[0]), float(b[3])]
+                            ]
                         
-                if not poly_coords and idx < len(boxes):
-                    b = boxes[idx]
-                    if hasattr(b, 'tolist'):
-                        b = b.tolist()
-                    poly_coords = [
-                        [b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]
-                    ]
+                    if poly_coords:
+                        xs = [pt[0] for pt in poly_coords]
+                        ys = [pt[1] for pt in poly_coords]
+                        bbox = [float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys))]
+                    else:
+                        bbox = [0.0, 0.0, 0.0, 0.0]
+                        
+                    regions.append({
+                        "id": region_id_counter,
+                        "text": str(text),
+                        "confidence": round(score, 4),
+                        "polygon": poly_coords,
+                        "bbox": bbox
+                    })
+                    region_id_counter += 1
                     
-                if poly_coords:
-                    xs = [pt[0] for pt in poly_coords]
-                    ys = [pt[1] for pt in poly_coords]
-                    bbox = [float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys))]
-                else:
-                    bbox = [0.0, 0.0, 0.0, 0.0]
-                    
-                regions.append({
-                    "id": idx + 1,
-                    "text": str(text),
-                    "confidence": round(score, 4),
-                    "polygon": poly_coords,
-                    "bbox": bbox
-                })
-                
-        # Format B: Traditional PaddleOCR list format [[[poly], (text, score)], ...]
-        elif isinstance(raw_output, list):
-            items = raw_output[0] if (len(raw_output) > 0 and isinstance(raw_output[0], list)) else raw_output
-            if items:
-                for idx, line in enumerate(items):
+            # Format B: Traditional PaddleOCR list format [[[poly], (text, score)], ...]
+            elif isinstance(page_data, (list, tuple)):
+                items = page_data[0] if (len(page_data) > 0 and isinstance(page_data[0], list) and len(page_data[0]) > 0 and isinstance(page_data[0][0], (list, tuple))) else page_data
+                for line in items:
+                    if not line:
+                        continue
                     if isinstance(line, (list, tuple)) and len(line) >= 2:
                         poly, text_info = line[0], line[1]
                         if isinstance(text_info, (list, tuple)):
@@ -118,19 +161,28 @@ class PaddleOCRProvider(BaseOCRProvider):
                             bbox = [0.0, 0.0, 0.0, 0.0]
                             
                         regions.append({
-                            "id": idx + 1,
+                            "id": region_id_counter,
                             "text": str(text),
                             "confidence": round(score, 4),
                             "polygon": poly_coords,
                             "bbox": bbox
                         })
+                        region_id_counter += 1
                         
         return regions
 
     def process_image(self, image: np.ndarray) -> List[Dict[str, Any]]:
+        if isinstance(image, np.ndarray) and image.ndim == 3 and image.shape[2] == 3:
+            bgr_image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        else:
+            bgr_image = image
+
         try:
-            res = self.ocr.ocr(image)
+            res = self.ocr.predict(bgr_image)
         except Exception:
-            res = self.ocr.predict(image)
+            try:
+                res = self.ocr.ocr(bgr_image)
+            except Exception:
+                res = self.ocr.ocr(image)
             
         return self._parse_paddle_output(res)

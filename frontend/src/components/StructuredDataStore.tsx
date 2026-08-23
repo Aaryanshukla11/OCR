@@ -378,18 +378,18 @@ export const StructuredDataStore: React.FC<StructuredDataStoreProps> = ({
               <thead>
                 <tr className="bg-zinc-950 border-b border-zinc-800 text-[10px] uppercase text-zinc-400 font-semibold tracking-wider select-none">
                   <th className="py-2.5 px-3 border-r border-zinc-800/80 w-12 text-center">#</th>
-                  <th className="py-2.5 px-4 border-r border-zinc-800/80 min-w-[180px]">Field Name</th>
-                  <th className="py-2.5 px-4 border-r border-zinc-800/80 min-w-[240px]">Extracted Value</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-800/80 min-w-[100px]">Type</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-800/80 min-w-[120px]">Validation</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-800/80 min-w-[90px] text-center">Conf</th>
-                  <th className="py-2.5 px-3 text-center min-w-[110px]">Actions</th>
+                  <th className="py-2.5 px-4 border-r border-zinc-800/80 min-w-[160px]">Field</th>
+                  <th className="py-2.5 px-4 border-r border-zinc-800/80 min-w-[220px]">Extracted Data</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-800/80 min-w-[180px]">Identified As</th>
+                  <th className="py-2.5 px-3 border-r border-zinc-800/80 min-w-[90px] text-center">Confidence</th>
+                  <th className="py-2.5 px-3 text-center min-w-[90px]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60 bg-zinc-950/40">
                 {entities.map((e, idx) => {
                   const valStr = String(e.normalized_value ?? e.raw_value);
-                  const isNormDifferent = e.normalized_value !== undefined && e.normalized_value !== null && String(e.normalized_value) !== e.raw_value;
+                  const identifiedLabel = e.identified_as ? e.identified_as.replace(/_/g, ' ').toUpperCase() : (e.value_type || 'TEXT');
+                  const confPct = Math.round((e.semantic_confidence ?? e.confidence ?? 0.95) * 100);
 
                   return (
                     <tr 
@@ -411,41 +411,23 @@ export const StructuredDataStore: React.FC<StructuredDataStoreProps> = ({
                       </td>
 
                       <td className="py-2 px-4 border-r border-zinc-800/60 text-zinc-100 select-text font-medium">
-                        <div className="flex items-center justify-between">
-                          <span 
-                            onClick={() => handleCopyText(valStr, e.label || e.key)}
-                            className="cursor-pointer hover:text-emerald-300 font-mono break-all"
-                            title="Click to copy value"
-                          >
-                            {valStr} {e.currency ? <strong className="text-emerald-400 font-bold ml-1">{e.currency}</strong> : ''}
-                          </span>
-
-                          {isNormDifferent && (
-                            <span className="text-[10px] text-zinc-500 ml-2 border border-zinc-800 px-1 rounded shrink-0" title={`Raw: ${e.raw_value}`}>
-                              Norm
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="py-2 px-3 border-r border-zinc-800/60 text-[11px] text-zinc-400 capitalize">
-                        {e.value_type}
-                      </td>
-
-                      <td className="py-2 px-3 border-r border-zinc-800/60 text-[10px]">
-                        <span className={`px-2 py-0.5 rounded font-mono font-medium border ${
-                          e.validation_status === 'VALIDATED'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                            : e.validation_status === 'OCR_MATCHED'
-                            ? 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        }`}>
-                          {e.validation_status || 'VALIDATED'}
+                        <span 
+                          onClick={() => handleCopyText(valStr, e.label || e.key)}
+                          className="cursor-pointer hover:text-emerald-300 font-mono break-all"
+                          title="Click to copy value"
+                        >
+                          {valStr} {e.currency ? <strong className="text-emerald-400 font-bold ml-1">{e.currency}</strong> : ''}
                         </span>
                       </td>
 
-                      <td className="py-2 px-3 border-r border-zinc-800/60 text-center text-zinc-400 text-[11px]">
-                        {Math.round(e.confidence * 100)}%
+                      <td className="py-2 px-3 border-r border-zinc-800/60 text-[11px]">
+                        <span className="px-2 py-0.5 rounded font-mono font-bold bg-zinc-900 border border-zinc-800 text-emerald-400">
+                          {identifiedLabel}
+                        </span>
+                      </td>
+
+                      <td className="py-2 px-3 border-r border-zinc-800/60 text-center text-zinc-300 text-[11px] font-bold">
+                        {confPct}%
                       </td>
 
                       <td className="py-2 px-3 text-center">
